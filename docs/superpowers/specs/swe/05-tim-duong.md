@@ -216,6 +216,15 @@ Chữ ký khởi đầu của `RoadGraph` và phần lõi của hàm tìm đư�
 | Giao thông | Tầng điển hình của spec 09 | Khi có khóa TomTom |
 | Goong trong kiểm thử | Đối tượng giả; kiểm thử không gọi mạng | Không thay |
 
+**Mạng đường thật của TP.HCM đã có (04/10/2026), ở `data/processed/hcm/`.** Đã kiểm theo hợp đồng và đạt: 120.120 nút, 272.052 cạnh, 43.352 đoạn, 148.662 dòng `edge_units`. Bốn điều phải xử lý khi nạp:
+
+- **Mạng không liên thông hoàn toàn:** 1.613 thành phần liên thông mạnh; thành phần lớn nhất chiếm 96% số nút. Điểm đi hoặc đến phải gắn vào nút gần nhất *thuộc thành phần lớn nhất*, nếu không sẽ gắn vào một ngõ cụt tách rời và không đi tới đâu được.
+- **133 cạnh khuyên** (`u` bằng `v`), hầu hết là đường nhỏ. Bỏ chúng khỏi ma trận khi dựng đồ thị.
+- **Cạnh dài bất thường:** 21 cạnh dài trên 3 km (dài nhất 15,5 km) và 16 cạnh ngắn hơn 1 m. Các cạnh dài đều là `motorway`, xe máy không đi, nên không ảnh hưởng xe máy; vẫn phải để ý khi tính "gắn nút gần nhất".
+- **Chỉ một nửa số cạnh có dòng trong `edge_units`** (cạnh không tên không có đoạn, đúng hợp đồng). Cạnh không có đoạn không bao giờ bị phạt ngập, kể cả khi nằm giữa vùng ngập. Phải nói rõ điều này trên giao diện khi đã có lớp ngập.
+
+Cột địa hình của `units.parquet` còn rỗng toàn bộ (đúng như dự kiến, đến hết ngày 4).
+
 Lưới mẫu quá nhỏ để thấy lộ trình thay thế có hợp lý hay không. Nếu hết ngày 2 mà mạng đường thật của TP.HCM chưa đến, kỹ sư phần mềm tự tải một vùng 5 × 5 km ở trung tâm bằng OSMnx, ghi ra đúng ba file theo hợp đồng (bảng `edge_units` để rỗng), và dùng nó cho tới khi file thật đến.
 
 ## 10. Nghiệm thu

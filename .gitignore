@@ -4,7 +4,9 @@ __pycache__/
 .pytest_cache/
 .env
 .env.local
-data/
+data/*
+!data/README.md
+!data/processed/
 web/node_modules/
 web/dist/
     
