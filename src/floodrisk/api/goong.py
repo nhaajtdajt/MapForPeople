@@ -9,6 +9,29 @@ class GoongError(Exception):
     pass
 
 
+def decode_polyline(encoded: str, precision: int = 5) -> list[tuple[float, float]]:
+    """Giải mã chuỗi polyline của Google/Goong thành danh sách (kinh độ, vĩ độ)."""
+    points: list[tuple[float, float]] = []
+    index = lat = lon = 0
+    while index < len(encoded):
+        for axis in (0, 1):
+            shift = result = 0
+            while True:
+                chunk = ord(encoded[index]) - 63
+                index += 1
+                result |= (chunk & 0x1F) << shift
+                shift += 5
+                if chunk < 0x20:
+                    break
+            delta = ~(result >> 1) if result & 1 else result >> 1
+            if axis == 0:
+                lat += delta
+            else:
+                lon += delta
+        points.append((lon / 10**precision, lat / 10**precision))
+    return points
+
+
 class Goong:
     def __init__(self, api_key: str, client: httpx.Client | None = None) -> None:
         self.api_key = api_key
@@ -46,6 +69,24 @@ class Goong:
             raise GoongError("không có tọa độ cho địa điểm này")
         return {"name": result.get("name", ""), "address": result.get("formatted_address", ""),
                 "lat": location["lat"], "lon": location["lng"]}
+
+    def directions(self, origin: tuple[float, float], destination: tuple[float, float], vehicle: str = "bike",
+                   alternatives: bool = True) -> list[dict]:
+        """Lộ trình của Goong. `origin` và `destination` là (vĩ độ, kinh độ). Goong chỉ trả 1 hoặc 2 lộ trình."""
+        data = self._get("/direction", {
+            "origin": f"{origin[0]},{origin[1]}", "destination": f"{destination[0]},{destination[1]}",
+            "vehicle": vehicle, "alternatives": "true" if alternatives else "false",
+        })
+        routes = []
+        for route in data.get("routes") or []:
+            legs = route.get("legs") or []
+            polyline = route["overview_polyline"]
+            routes.append({
+                "distance_m": sum(leg["distance"]["value"] for leg in legs),
+                "duration_s": sum(leg["duration"]["value"] for leg in legs),
+                "polyline": polyline["points"] if isinstance(polyline, dict) else polyline,
+            })
+        return routes
 
     def reverse(self, lat: float, lon: float) -> dict:
         """Địa chỉ của một tọa độ. Không có kết quả thì trả các trường rỗng, không phải lỗi."""

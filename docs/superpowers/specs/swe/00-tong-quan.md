@@ -45,10 +45,10 @@ Mỗi tính năng có hai cột trạng thái, vì "xong" có hai bậc: chạy 
 | S8.2 | Ô tìm kiếm và thẻ địa điểm | Lõi | 1 | 08 | đang: tìm kiếm và thẻ xong 04/10; ba nút chờ spec 05 và 03 | không áp dụng |
 | S8.3 | Chạm để ghim và xem địa chỉ | Lõi | 1 | 08 | xong 04/10 (trừ chạm vào đoạn ngập, chờ spec 02) | không áp dụng |
 | S8.4 | Vị trí của tôi | Lõi | 1 | 08 | đang: mã xong 04/10, chưa thử được (cần Chrome thật) | — |
-| S5.1 | Tìm đường lúc bình thường: nhanh nhất, lộ trình thay thế, chỉ dẫn | Lõi | 2 | 05 | — | — |
+| S5.1 | Tìm đường lúc bình thường: nhanh nhất, lộ trình thay thế, chỉ dẫn | Lõi | 2 | 05 | xong 04/10 (thuật toán, chỉ dẫn, `GET /api/route`; chưa gọi Goong) | xong 04/10: chạy trên mạng đường TP.HCM thật, ~280 ms mỗi lần |
 | S5.2 | Giao diện lộ trình: nhiều lộ trình, thời gian, giờ tới nơi | Lõi | 2 | 05 | — | — |
 | S9.1 | Giao thông điển hình theo giờ | Lõi | 2 | 09 | — | không áp dụng |
-| S5.3 | Đối chiếu thuật toán riêng với Goong | Lõi | 2, 8 | 05 | — | — |
+| S5.3 | Đối chiếu thuật toán riêng với Goong | Lõi | 2, 8 | 05 | xong 04/10 (`routecheck`, chưa có TomTom) | đã đo cho xe máy và ô tô; chạy lại ngày 8 |
 | S2.1 | Máy chủ phục vụ lớp nguy cơ | Lõi | 3 | 02 | — | — |
 | S2.2 | Lớp nguy cơ trên bản đồ, chú thích, chọn giờ | Lõi | 3 | 02 | — | — |
 | S4.1 | Chọn kịch bản và phát lại | Lõi | 3 | 04 | — | — |
