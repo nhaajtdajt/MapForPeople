@@ -53,8 +53,9 @@ Hai dòng cuối cần một ứng dụng di động và dữ liệu địa đi�
 ## 4. Chạm để ghim và xem địa chỉ (S8.3)
 
 - Chạm vào một điểm trống trên bản đồ: đặt ghim, gọi `GET /api/places/reverse`, mở thẻ địa điểm với địa chỉ vừa nhận. Trong lúc chờ, thẻ hiện tọa độ.
-- Chạm vào một đoạn đã tô màu của lớp ngập thì mở thẻ giải thích (spec 02), không đặt ghim.
-- Chạm ra ngoài thẻ, hoặc bấm nút đóng, thì bỏ ghim.
+- Chạm vào một điểm khác khi đã có ghim thì ghim chuyển sang điểm đó. Chạm vào một đoạn đã tô màu của lớp ngập thì mở thẻ giải thích (spec 02), không đặt ghim.
+- Bấm nút × trên thẻ thì bỏ ghim. (Bản trước viết "chạm ra ngoài thẻ thì bỏ ghim"; điều đó mâu thuẫn với việc chạm để đặt ghim mới nên đã bỏ.)
+- Thẻ bỏ phần trùng giữa tên và địa chỉ: Goong thường trả địa chỉ bắt đầu bằng đúng tên địa điểm, nên dòng phụ chỉ giữ phần còn lại ("Chợ Bến Thành" và "Bến Thành, Hồ Chí Minh").
 
 Điều này thay cho hành vi cũ "chạm vào bản đồ là mở bảng báo ngập". Báo ngập giờ đi qua nút trong thẻ địa điểm hoặc mục "Báo ngập" ở thanh dưới.
 
@@ -103,28 +104,31 @@ Không có. Spec này chỉ phụ thuộc vào Goong, và hai khóa đã có. Tr
 
 ## 10. Nghiệm thu
 
+Đánh dấu `[x]` là đã thử ngày 04/10/2026 trên trình duyệt tích hợp của ứng dụng Claude (cả khung máy tính và khung 360 px), trên dữ liệu mẫu. `[ ]` là chưa làm hoặc chưa thử được; lý do ghi ngay sau.
+
 **S8.1:**
 
-- [ ] Bản đồ Goong hiện đúng, kéo và phóng mượt trên điện thoại; có nút phóng, la bàn, thước tỉ lệ, dòng bản quyền.
-- [ ] Tải lại trang thì bản đồ ở đúng chỗ vừa rời đi.
+- [x] Bản đồ Goong hiện đúng ở khung 360 px, không tràn ngang; có nút phóng, la bàn, thước tỉ lệ, dòng bản quyền. Cả dev lẫn bản dựng sản xuất đều hiện bản đồ.
+- [ ] Kéo và phóng mượt bằng cảm ứng trên điện thoại thật. Chưa thử: công cụ kiểm chỉ giả lập khung hình, không giả lập thao tác chạm.
+- [x] Tải lại trang thì bản đồ ở đúng chỗ vừa rời đi.
 
 **S8.2:**
 
-- [ ] Gõ "cho ben thanh" hiện "Chợ Bến Thành"; chọn thì bản đồ bay tới, có ghim và thẻ địa điểm.
-- [ ] Ba nút trên thẻ mở đúng bảng với đúng điểm đã điền.
-- [ ] Goong lỗi thì ô tìm kiếm báo bằng tiếng Việt, trang không hỏng.
+- [x] Gõ "cho ben thanh" hiện "Chợ Bến Thành" đầu danh sách; chọn thì bản đồ bay tới, có ghim và thẻ địa điểm.
+- [ ] Ba nút trên thẻ mở đúng bảng với đúng điểm đã điền. Ba nút hiện đang bị khóa vì bảng tìm đường (spec 05) và bảng báo ngập (spec 03) chưa làm.
+- [ ] Goong lỗi thì ô tìm kiếm báo bằng tiếng Việt, trang không hỏng. Mã đã có và phía máy chủ đã có kiểm thử (lỗi Goong thành 502 có lời tiếng Việt); chưa thử trên trình duyệt với Goong hỏng thật.
 
 **S8.3:**
 
-- [ ] Chạm vào một điểm trống đặt ghim và hiện địa chỉ.
-- [ ] Chạm vào một đoạn tô màu mở thẻ giải thích, không đặt ghim.
-- [ ] Goong lỗi thì thẻ hiện tọa độ, ba nút vẫn dùng được.
+- [x] Chạm vào một điểm trống đặt ghim và hiện địa chỉ (đã thử ở khung máy tính và khung 360 px).
+- [ ] Chạm vào một đoạn tô màu mở thẻ giải thích, không đặt ghim. Lớp ngập chưa vẽ (spec 02).
+- [ ] Goong lỗi thì thẻ hiện tọa độ, ba nút vẫn dùng được. Mã đã có; chưa thử trên trình duyệt với Goong hỏng thật.
 
 **S8.4:**
 
-- [ ] Trên `localhost`, nút định vị đưa bản đồ tới vị trí hiện tại và hiện chấm xanh.
-- [ ] Trên máy chủ chưa có HTTPS, nút hiện lời giải thích thay vì im lặng.
-- [ ] Từ chối quyền định vị không làm hỏng tính năng nào.
+- [ ] Trên `localhost`, nút định vị đưa bản đồ tới vị trí hiện tại và hiện chấm xanh. Chưa thử được: trình duyệt tích hợp báo "Geolocation support is not available". Phải thử trên Chrome thật.
+- [ ] Trên máy chủ chưa có HTTPS, nút hiện lời giải thích thay vì im lặng. Mã đã có (nút mờ, bấm hiện lời giải thích); chưa thử vì `localhost` luôn được coi là an toàn, cần mở qua địa chỉ mạng LAN hoặc máy EC2.
+- [ ] Từ chối quyền định vị không làm hỏng tính năng nào. Chưa thử, cùng lý do.
 
 **S8.5:**
 

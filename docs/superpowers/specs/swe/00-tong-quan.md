@@ -38,13 +38,13 @@ Mỗi tính năng có hai cột trạng thái, vì "xong" có hai bậc: chạy 
 
 | Mã | Tính năng | Ưu tiên | Ngày | Spec | Trên dữ liệu mẫu | Trên dữ liệu thật |
 |---|---|---|---|---|---|---|
-| S1.1 | Khung repo, cấu hình, hợp đồng, dữ liệu mẫu | Lõi | 1 | 01 | — | không áp dụng |
-| S1.2 | Lớp giả: `devdata`, `ports`, `fakes` | Lõi | 1 | 01 | — | không áp dụng |
-| S1.3 | Lệnh kiểm tra nối ghép `doctor`, trạng thái trong `/api/health` | Lõi | 1–3 | 01 | — | — |
-| S8.1 | Khung bản đồ và điều khiển | Lõi | 1 | 08 | — | không áp dụng |
-| S8.2 | Ô tìm kiếm và thẻ địa điểm | Lõi | 1 | 08 | — | không áp dụng |
-| S8.3 | Chạm để ghim và xem địa chỉ | Lõi | 1 | 08 | — | không áp dụng |
-| S8.4 | Vị trí của tôi | Lõi | 1 | 08 | — | — |
+| S1.1 | Khung repo, cấu hình, hợp đồng, dữ liệu mẫu | Lõi | 1 | 01 | xong 04/10 (12/12 kiểm thử của kế hoạch 01) | không áp dụng |
+| S1.2 | Lớp giả: `devdata`, `ports`, `fakes` | Lõi | 1 | 01 | xong 04/10 | không áp dụng |
+| S1.3 | Lệnh kiểm tra nối ghép `doctor`, trạng thái trong `/api/health` | Lõi | 1–3 | 01 | đang: `/api/health` xong 04/10, `doctor` chưa làm | — |
+| S8.1 | Khung bản đồ và điều khiển | Lõi | 1 | 08 | xong 04/10 (chưa thử cảm ứng thật) | không áp dụng |
+| S8.2 | Ô tìm kiếm và thẻ địa điểm | Lõi | 1 | 08 | đang: tìm kiếm và thẻ xong 04/10; ba nút chờ spec 05 và 03 | không áp dụng |
+| S8.3 | Chạm để ghim và xem địa chỉ | Lõi | 1 | 08 | xong 04/10 (trừ chạm vào đoạn ngập, chờ spec 02) | không áp dụng |
+| S8.4 | Vị trí của tôi | Lõi | 1 | 08 | đang: mã xong 04/10, chưa thử được (cần Chrome thật) | — |
 | S5.1 | Tìm đường lúc bình thường: nhanh nhất, lộ trình thay thế, chỉ dẫn | Lõi | 2 | 05 | — | — |
 | S5.2 | Giao diện lộ trình: nhiều lộ trình, thời gian, giờ tới nơi | Lõi | 2 | 05 | — | — |
 | S9.1 | Giao thông điển hình theo giờ | Lõi | 2 | 09 | — | không áp dụng |

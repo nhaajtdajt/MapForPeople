@@ -123,33 +123,36 @@ Lệnh này là bước đầu tiên mỗi khi nhận file từ người khác. 
 
 ## 4. Cách chạy lúc phát triển
 
-Ba biến môi trường trong lúc còn dùng dữ liệu mẫu: `FLOODRISK_DATA=data/sample`, `REFRESH_MINUTES=0`, `FLOODRISK_TEST_TOOLS=1`. Khóa bản đồ của Goong được chép từ `.env` ở thư mục gốc sang `web/.env.local` với tên `VITE_GOONG_MAP_KEY`.
+Hai lệnh, mỗi lệnh một cửa sổ dòng lệnh, đều chạy từ thư mục gốc (đã kích hoạt môi trường ảo):
 
 ```bash
-python -m floodrisk.api.devdata data/sample
+python -m floodrisk.api.dev
 ```
 
 ```bash
-uvicorn floodrisk.api.main:create_app --factory --reload --port 8000
+npm --prefix web run dev
 ```
 
-```bash
-npm run dev
-```
+- `floodrisk.api.dev` mặc định đặt `FLOODRISK_DATA=data/sample`, `REFRESH_MINUTES=0`, `FLOODRISK_TEST_TOOLS=1`, tự sinh dữ liệu mẫu nếu chưa có, và đọc khóa Goong, TomTom từ `.env`. Muốn chạy trên dữ liệu thật hoặc đổi cổng thì đặt biến môi trường trong cửa sổ dòng lệnh trước (giá trị đặt ở đó thắng giá trị trong `.env`). Muốn làm mới dữ liệu mẫu (ví dụ để `computed_at` là giờ hiện tại) thì chạy `python -m floodrisk.api.devdata data/sample`.
+- Giao diện đọc `VITE_GOONG_MAP_KEY` thẳng từ `.env` ở thư mục gốc (Vite đặt `envDir` ở đó), nên **không cần** chép khóa sang `web/.env.local`. Vite chỉ đưa các biến có tiền tố `VITE_` xuống trình duyệt, nên `GOONG_API_KEY` và `TOMTOM_API_KEY` không lọt ra ngoài.
+- Cổng 5173 chuyển tiếp mọi đường dẫn `/api` sang cổng 8000.
+- Tệp `.claude/launch.json` có sẵn ba cấu hình (`api`, `web`, `web-preview`) để ứng dụng Claude mở được máy chủ và trình duyệt tích hợp. `web-preview` chạy bản dựng sản xuất ở cổng 4173, dùng để kiểm tra bản dựng.
 
-Lệnh thứ ba chạy trong thư mục `web/`.
+**Hai lỗi MapLibre GL 6 + Vite đã gặp ngày 04/10, đã sửa trong mã (đừng gỡ):** bản đồ trắng và console báo `Worker failed to load`. MapLibre tìm file worker cạnh chính nó, mà Vite gộp mã vào một tệp. Cách sửa nằm ở `web/src/MapView.tsx` (nhập worker bằng `?worker&url` rồi gọi `setWorkerUrl`) và `worker: { format: "es" }` trong `web/vite.config.ts`. Cả chế độ dev lẫn bản dựng sản xuất đều đã được thử trên trình duyệt.
 
 ## 5. Nghiệm thu
 
-- [ ] `pytest` đạt 12 kiểm thử của kế hoạch 01 trong môi trường ảo Python 3.12.
-- [ ] Repo có nhánh `main` đã đẩy lên và nhánh `web`.
-- [ ] `python -m floodrisk.api.devdata data/sample` tạo dữ liệu cho cả `hcm` và `danang`, có file đánh dấu `SAMPLE`.
-- [ ] Khi chưa có file `floodrisk/model/evidence.py`, máy chủ vẫn khởi động và `/api/health` ghi cả bốn phần là `fake`.
-- [ ] Đặt một file `evidence.py` có lỗi cú pháp vào `floodrisk/model/` thì máy chủ dừng với lỗi đó, không lùi về bản giả.
-- [ ] Không file nào trong `src/floodrisk/api/` ngoài `ports.py` có dòng nhập từ `floodrisk.model`, `floodrisk.data` hay `floodrisk.jobs`. Có một kiểm thử quét mã nguồn để giữ điều này.
-- [ ] `tests/api/test_port_contract.py` đạt với bản giả.
-- [ ] `python -m floodrisk.api.doctor hcm danang` đạt trên dữ liệu mẫu, và báo lỗi nêu đúng tên cột khi xóa một cột của `scores.parquet`.
-- [ ] Giao diện hiện nhãn "Dữ liệu mẫu" khi chạy trên `data/sample`.
+Đánh dấu `[x]` là đã thử ngày 04/10/2026; `[ ]` là chưa làm hoặc chưa thử.
+
+- [x] `pytest` đạt 12 kiểm thử của kế hoạch 01 trong môi trường ảo Python 3.12 (toàn bộ hiện là 47 kiểm thử đạt).
+- [ ] Repo có nhánh `main` đã đẩy lên và nhánh `web` (việc git do chủ dự án giữ).
+- [x] `python -m floodrisk.api.devdata data/sample` tạo dữ liệu cho cả `hcm` và `danang`, có file đánh dấu `SAMPLE`.
+- [x] Khi chưa có file `floodrisk/model/evidence.py`, máy chủ vẫn khởi động và `/api/health` ghi cả bốn phần là `fake`. (Kiểm bằng kiểm thử `test_ports_selection.py` và gọi thật `/api/health`.)
+- [x] Một module thật có lỗi cú pháp, hoặc thiếu thư viện ngoài, làm máy chủ dừng với lỗi đó, không lùi về bản giả. (Kiểm bằng kiểm thử giả lập lỗi khi nhập, chưa thử bằng file thật đặt vào `floodrisk/model/`.)
+- [x] Không file nào trong `src/floodrisk/api/` ngoài `ports.py` có dòng nhập từ `floodrisk.model`, `floodrisk.data` hay `floodrisk.jobs`. Có kiểm thử quét mã nguồn để giữ điều này.
+- [x] `tests/api/test_port_contract.py` đạt với bản giả.
+- [ ] `python -m floodrisk.api.doctor hcm danang` đạt trên dữ liệu mẫu, và báo lỗi nêu đúng tên cột khi xóa một cột của `scores.parquet`. (Chưa làm; làm cùng lúc nhận file thật, ngày 2–3.)
+- [x] Giao diện hiện nhãn "Dữ liệu mẫu" khi chạy trên `data/sample`.
 
 ## 6. Không làm
 
