@@ -4,11 +4,13 @@ import { api, ApiError, isAbort, type Camera, type City, type CityKey, type Floo
 import CameraCard from "./components/CameraCard";
 import LayersPanel from "./components/LayersPanel";
 import PlaceCard, { type Pin } from "./components/PlaceCard";
+import DirectionsPanel from "./components/DirectionsPanel";
 import ReportSheet from "./components/ReportSheet";
 import SearchBar from "./components/SearchBar";
 import StatusChip from "./components/StatusChip";
 import { floodNote, riskLine } from "./lib/floodnote";
 import { loadView, saveView } from "./lib/viewstore";
+import { useDirections } from "./lib/useDirections";
 import MapView, { type FlyTarget, type MapHit, type MapViewState } from "./MapView";
 
 // Khung nhìn khi mở lần đầu: trung tâm TP.HCM (trùng config.py). Đổi thành phố thì lấy tâm từ /api/cities.
@@ -55,7 +57,8 @@ export default function App() {
   const [center, setCenter] = useState({ lat: initial.center[1], lon: initial.center[0] });
   const [notice, setNotice] = useState<string | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
-  const [, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
+  const directions = useDirections();
 
   const cityRef = useRef(cityKey);
   cityRef.current = cityKey;
@@ -123,6 +126,7 @@ export default function App() {
   }, []);
 
   const handleTap = useCallback((lat: number, lon: number, tapped: MapHit | null) => {
+    if (directions.handleMapTap(lat, lon)) return;
     reverseRef.current?.abort();
     setLayersOpen(false);
     if (tapped?.kind === "camera") {
@@ -143,7 +147,7 @@ export default function App() {
       .catch((error) => {
         if (!isAbort(error)) setPin({ lat, lon, name: "", address: "", loading: false });
       });
-  }, []);
+  }, [directions.handleMapTap]);
 
   const handlePick = useCallback(
     (place: PlaceDetail) => {
@@ -197,10 +201,10 @@ export default function App() {
   const sheet = camera ? "24rem" : pin ? (note ? "20rem" : "13rem") : "0px";
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: sheet }}>
+    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: directions.isOpen ? "50dvh" : sheet }}>
       <MapView
         initial={initial}
-        pin={pin}
+        pin={directions.isOpen ? null : pin}
         flyTo={flyTo}
         risk={riskView}
         showRisk={showRisk}
@@ -209,6 +213,13 @@ export default function App() {
         cameras={cameras}
         showCameras={showCameras}
         reports={reports}
+        routes={directions.routes}
+        selectedRouteId={directions.selectedRouteId}
+        routeRevision={directions.routeRevision}
+        directionOrigin={directions.origin}
+        directionDestination={directions.destination}
+        directionsOpen={directions.isOpen}
+        onRouteSelect={directions.selectRoute}
         onTap={handleTap}
         onMoveEnd={handleMoveEnd}
         onLocate={(lat, lon, accuracy) => setUserLocation({ lat, lon, accuracy })}
@@ -249,11 +260,21 @@ export default function App() {
           onClose={() => setLayersOpen(false)}
         />
       )}
-      {pin && <PlaceCard pin={pin} flood={note} onClose={closePin} onReport={() => setReporting(true)} />}
-      {camera && <CameraCard camera={camera} onClose={() => setCamera(null)} onRead={() => setRiskTick((value) => value + 1)} />}
+      {pin && !directions.isOpen && (
+        <PlaceCard
+          pin={pin}
+          flood={note}
+          onClose={closePin}
+          onDirectionsTo={() => directions.startTo(pin, userLocation)}
+          onDirectionsFrom={() => directions.startFrom(pin)}
+          onReport={() => setReporting(true)}
+        />
+      )}
+      {camera && !directions.isOpen && <CameraCard camera={camera} onClose={() => setCamera(null)} onRead={() => setRiskTick((value) => value + 1)} />}
       {reporting && pin && (
         <ReportSheet place={pin.name || "Điểm đã chọn"} busy={sending} onChoose={sendReport} onClose={() => setReporting(false)} />
       )}
+      <DirectionsPanel directions={directions} near={center} />
 
       {notice && (
         <div role="status" className="pointer-events-none absolute inset-x-0 top-28 z-30 flex justify-center px-4">
