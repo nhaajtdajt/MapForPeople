@@ -10,7 +10,7 @@ import geopandas  # noqa: F401  (đảm bảo parquet đọc được)
 import pandas as pd
 
 from floodrisk import config, contracts
-from floodrisk.api import ports
+from floodrisk.api import fakes, ports
 
 NOW = datetime(2026, 10, 4, 12, 0, tzinfo=timezone.utc)
 
@@ -27,7 +27,7 @@ def test_no_reports_leaves_prior_untouched():
 def test_four_reporters_of_high_flood_reach_high_level():
     reports = [_report(f"u{k}", "high", 10) for k in range(4)]
     result = ports.apply_evidence(0.1, reports, NOW)
-    assert int(ports.to_level(result.risk)) == 2 and result.reporters == 4 and result.reported_level == 3
+    assert int(fakes.to_level(result.risk)) == 2 and result.reporters == 4 and result.reported_level == 3
 
 
 def test_same_reporter_counts_once_and_latest_wins():
@@ -47,7 +47,7 @@ def test_clear_report_never_raises_risk():
 
 
 def test_levels_use_config_thresholds():
-    levels = ports.to_level([0.0, config.LEVEL_MEDIUM - 1e-6, config.LEVEL_MEDIUM, config.LEVEL_HIGH, 1.0])
+    levels = fakes.to_level([0.0, config.LEVEL_MEDIUM - 1e-6, config.LEVEL_MEDIUM, config.LEVEL_HIGH, 1.0])
     assert list(levels) == [0, 0, 1, 2, 2]
 
 
@@ -83,6 +83,3 @@ def test_past_moment_scenario_is_valid(data):
     index = json.loads((config.replay_dir("hcm") / "index.json").read_text(encoding="utf-8"))
     assert next(row for row in index if row["id"] == scenario)["kind"] == "past-moment"
 
-
-def test_hourly_returns_a_list():
-    assert isinstance(ports.run_hourly(), list)

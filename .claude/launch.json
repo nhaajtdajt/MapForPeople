@@ -8,6 +8,12 @@
       "port": 8000
     },
     {
+      "name": "api-real",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "floodrisk.api.dev", "--real"],
+      "port": 8000
+    },
+    {
       "name": "web",
       "runtimeExecutable": "node",
       "runtimeArgs": ["web/node_modules/vite/bin/vite.js", "web", "--port", "5173", "--strictPort"],

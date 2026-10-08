@@ -30,9 +30,9 @@ def test_missing_floodrisk_module_falls_back_to_fake(monkeypatch):
         raise ModuleNotFoundError(f"No module named '{name}'", name=name)
 
     _reload_with(monkeypatch, missing)
-    assert ports.status() == {"evidence": "fake", "levels": "fake", "scenarios": "fake", "hourly": "fake"}
+    assert ports.status() == {"risk": "real", "evidence": "fake", "scenarios": "fake"}
     assert ports._objects["apply_evidence"] is fakes.apply_evidence
-    assert ports._objects["run_hourly"] is fakes.run_hourly
+    assert ports._objects["make_synthetic"] is fakes.make_synthetic
 
 
 def test_missing_third_party_library_is_not_hidden(monkeypatch):
@@ -78,7 +78,7 @@ def test_real_module_is_used_when_present(monkeypatch, tmp_path):
         raise ModuleNotFoundError(f"No module named '{name}'", name=name)
 
     _reload_with(monkeypatch, only_evidence)
-    assert ports.status()["evidence"] == "real" and ports.status()["levels"] == "fake"
+    assert ports.status()["evidence"] == "real" and ports.status()["scenarios"] == "fake"
     # tên công khai của `ports` được gán một lần lúc nhập module; ở đây kiểm cái mà `_load` đã chọn
     assert ports._objects["apply_evidence"](0, [], None) == "thật"
     sys.modules.pop("evidence_probe", None)

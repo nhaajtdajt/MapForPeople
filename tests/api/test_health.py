@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 def test_health_reports_sample_data_and_fake_parts(client):
     body = client.get("/api/health").json()
     assert body["ok"] is True and body["data"] == "sample" and body["test_tools"] is False
-    assert set(body["parts"]) == {"evidence", "levels", "scenarios", "hourly"}
+    assert set(body["parts"]) == {"risk", "evidence", "scenarios"} and body["parts"]["risk"] == "real"
     assert set(body["parts"].values()) <= {"real", "fake"}
     assert body["traffic"]["hcm"] == {"source": "typical", "observed_at": None}
     assert body["last_refresh"] is None and body["last_error"] is None

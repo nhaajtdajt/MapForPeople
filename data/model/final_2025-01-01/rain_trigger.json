@@ -1,0 +1,59 @@
+{
+  "selected_features": [
+    "rain_max_3h_mm",
+    "rain_total_mm"
+  ],
+  "C": 0.1,
+  "class_weight": "balanced",
+  "random_state": 713,
+  "coef": [
+    0.02283375645176585,
+    0.02851568232758494
+  ],
+  "intercept": -0.0017792662252086328,
+  "n_fit_rows": 7728,
+  "n_fit_positive_days": 46,
+  "n_positive_days_by_city": {
+    "ho_chi_minh": 31,
+    "da_nang": 15
+  },
+  "fit_cutoff": "2025-01-01",
+  "max_fit_date_actual": "2024-12-31",
+  "fit_label_split": "train, train_undated and DEV train rows only; all dates < cutoff",
+  "pooled_cities": [
+    "ho_chi_minh",
+    "da_nang"
+  ],
+  "fit_source": "ERA5 percentiles using source-specific CDFs built strictly before cutoff",
+  "cdf_metadata": {
+    "ho_chi_minh_era5": {
+      "n_reference_days": 8401,
+      "reference_start": "2002-01-01",
+      "reference_end": "2024-12-31",
+      "test_appended_days": 643
+    },
+    "ho_chi_minh_ifs": {
+      "n_reference_days": 2922,
+      "reference_start": "2017-01-01",
+      "reference_end": "2024-12-31",
+      "test_appended_days": 643
+    },
+    "da_nang_era5": {
+      "n_reference_days": 8401,
+      "reference_start": "2002-01-01",
+      "reference_end": "2024-12-31",
+      "test_appended_days": 643
+    },
+    "da_nang_ifs": {
+      "n_reference_days": 2922,
+      "reference_start": "2017-01-01",
+      "reference_end": "2024-12-31",
+      "test_appended_days": 643
+    }
+  },
+  "frozen_states": {
+    "q_watch": 0.5093524878214044,
+    "q_alert": 0.5395158283435458,
+    "source": "final_config.json frozen Task 7 knee"
+  }
+}

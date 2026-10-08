@@ -17,10 +17,9 @@ export function addressRest(name: string, address: string): string {
 }
 
 const PART_LABELS: Record<string, string> = {
+  risk: "mức nguy cơ",
   evidence: "báo cáo người dùng",
-  levels: "mức nguy cơ",
   scenarios: "kịch bản",
-  hourly: "tác vụ mỗi giờ",
 };
 
 export function fakePartLabels(health: Health | null): string[] {

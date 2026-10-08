@@ -2,13 +2,18 @@
 
     python -m floodrisk.api.dev
 
-Mặc định dùng dữ liệu mẫu (`data/sample`, tự sinh nếu chưa có), tắt tác vụ nền và bật bàn thử. Muốn chạy trên dữ liệu
-thật hoặc đổi cổng thì đặt biến môi trường trong cửa sổ dòng lệnh trước khi chạy (FLOODRISK_DATA, REFRESH_MINUTES,
-FLOODRISK_TEST_TOOLS, PORT); giá trị đặt ở đó thắng giá trị trong `.env`. Khóa Goong và TomTom đọc từ `.env`.
+Mặc định dùng dữ liệu mẫu (`data/sample`, tự sinh nếu chưa có), tắt tác vụ nền và bật bàn thử. Chạy trên dữ liệu thật
+và mô hình thật trong `data/`:
+
+    python -m floodrisk.api.dev --real
+
+Muốn đổi thư mục dữ liệu hoặc cổng thì đặt biến môi trường trong cửa sổ dòng lệnh trước khi chạy (FLOODRISK_DATA,
+REFRESH_MINUTES, FLOODRISK_TEST_TOOLS, PORT); giá trị đặt ở đó thắng giá trị trong `.env`. Khóa Goong và TomTom đọc từ `.env`.
 """
 from __future__ import annotations
 
 import os
+import sys
 from pathlib import Path
 
 import uvicorn
@@ -17,6 +22,9 @@ from floodrisk.api.devdata import make_dev_data
 
 
 def main() -> None:
+    if "--real" in sys.argv[1:]:
+        os.environ.setdefault("FLOODRISK_DATA", "data")
+        os.environ.setdefault("REFRESH_MINUTES", "60")
     os.environ.setdefault("FLOODRISK_DATA", "data/sample")
     os.environ.setdefault("REFRESH_MINUTES", "0")
     os.environ.setdefault("FLOODRISK_TEST_TOOLS", "1")

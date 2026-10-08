@@ -1,0 +1,18 @@
+{
+  "repo": "flood_prediction_models",
+  "cities": {
+    "ho_chi_minh": {
+      "commit": "842da0a2a6f7c22d96b75ebc2a7f93be65d5a1bd",
+      "files": [
+        "final_config.json",
+        "combination_thresholds.json",
+        "final_2025-01-01/rain_trigger.json",
+        "m2_ho_chi_minh_tide.json",
+        "final_2025-01-01/cdfs/ho_chi_minh_ifs_reference.parquet",
+        "final_2025-01-01/cdfs/ho_chi_minh_era5_reference.parquet",
+        "final_2025-01-01/ho_chi_minh/route_susceptibility.parquet"
+      ],
+      "copied_at": "2026-10-08T13:02:15+07:00"
+    }
+  }
+}

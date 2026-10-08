@@ -7,7 +7,7 @@ const base: Health = {
   ok: true,
   test_tools: false,
   data: "real",
-  parts: { evidence: "real", levels: "real", scenarios: "real", hourly: "real" },
+  parts: { risk: "real", evidence: "real", scenarios: "real" },
   traffic: {},
   last_refresh: null,
   last_error: null,

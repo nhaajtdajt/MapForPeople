@@ -27,6 +27,8 @@ RAIN_CELL_DEG = 0.1
 LEVEL_MEDIUM = 0.35
 LEVEL_HIGH = 0.60
 TZ = "Asia/Ho_Chi_Minh"
+MODEL_VERSION = "final_2025-01-01"  # thư mục mô hình đã chốt trong repo flood_prediction_models
+MODEL_CITY = {"hcm": "ho_chi_minh", "danang": "da_nang"}  # tên thành phố trong repo mô hình
 
 
 def data_dir() -> Path:
@@ -41,6 +43,28 @@ def processed_dir(city: str) -> Path:
     if city not in CITIES:
         raise KeyError(f"Thành phố chưa có trong cấu hình: {city}")
     return data_dir() / "processed" / city
+
+
+def model_dir() -> Path:
+    """Các file mô hình chép nguyên văn từ repo flood_prediction_models (ghi chú 11, QĐ1)."""
+    return data_dir() / "model"
+
+
+def route_table_path(city: str) -> Path:
+    return processed_dir(city) / "route_table.parquet"
+
+
+def risk_layer_path(city: str) -> Path:
+    return processed_dir(city) / "risk_routes.geojson.gz"
+
+
+def tide_hourly_path(city: str) -> Path:
+    return processed_dir(city) / "tide_hourly.parquet"
+
+
+def flood_points_path(city: str) -> Path:
+    """Danh sách điểm ngập Phòng CSGT công bố ngày 06/10/2026, đã định vị (tools/doi_chieu_122_diem.py)."""
+    return processed_dir(city) / "diem_ngap_pc08_2026-10-06.csv"
 
 
 def units_path(city: str) -> Path:

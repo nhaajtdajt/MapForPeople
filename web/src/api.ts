@@ -1,5 +1,9 @@
 // Nơi duy nhất giao diện gọi máy chủ. Khóa REST của Goong và TomTom chỉ nằm ở máy chủ.
 
+import type { FeatureCollection, Point } from "geojson";
+
+import type { DayState } from "./lib/risk";
+
 const BASE: string = import.meta.env.VITE_API_BASE ?? "";
 
 export class ApiError extends Error {
@@ -50,6 +54,43 @@ export interface ReverseResult {
   place_id: string | null;
 }
 
+export interface CauseNow {
+  state: DayState;
+  trigger: number;
+  max_3h_mm?: number;
+  total_24h_mm?: number;
+  astro_m?: number;
+}
+
+export interface RiskHour {
+  valid_time: string;
+  rain: CauseNow;
+  tide: CauseNow;
+  counts: { high: number; medium: number };
+}
+
+/** Mức nguy cơ lúc này và hai giờ tới của một thành phố (GET /api/risk). */
+export interface RiskState {
+  city: CityKey;
+  model_version: string;
+  generated_at: string;
+  rain_source: string;
+  stale: boolean;
+  error: string | null;
+  hours: RiskHour[];
+  layer: { url: string } | null;
+}
+
+export interface FloodPointProps {
+  no: number;
+  cause: "rain" | "tide";
+  place: string;
+  located_by: string;
+  routes: string;
+}
+
+export type FloodPoints = FeatureCollection<Point, FloodPointProps> & { source: string };
+
 type Params = Record<string, string | number | undefined>;
 
 async function getJson<T>(path: string, params: Params = {}, signal?: AbortSignal): Promise<T> {
@@ -87,7 +128,14 @@ export const api = {
     getJson<PlaceDetail>("/api/places/detail", { place_id: placeId }, signal),
   reverse: (lat: number, lon: number, signal?: AbortSignal) =>
     getJson<ReverseResult>("/api/places/reverse", { lat, lon }, signal),
+  risk: (city: CityKey, signal?: AbortSignal) => getJson<RiskState>("/api/risk", { city }, signal),
+  floodPoints: (city: CityKey, signal?: AbortSignal) => getJson<FloodPoints>("/api/risk/points", { city }, signal),
 };
+
+/** Đường dẫn đầy đủ tới một tài nguyên của máy chủ, cho những chỗ MapLibre tự tải (lớp tuyến). */
+export function serverUrl(path: string): string {
+  return `${BASE}${path}`;
+}
 
 export function isAbort(error: unknown): boolean {
   return error instanceof DOMException && error.name === "AbortError";

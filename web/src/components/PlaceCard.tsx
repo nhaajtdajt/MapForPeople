@@ -8,8 +8,22 @@ export interface Pin {
   loading: boolean;
 }
 
+/** Thông tin ngập tại chỗ vừa chạm: mức của tuyến theo mô hình, hoặc một điểm ngập đã công bố. */
+export interface FloodNote {
+  tone: "high" | "medium" | "info";
+  title: string;
+  lines: string[];
+}
+
+const NOTE_TONE: Record<FloodNote["tone"], string> = {
+  high: "border-red-300 bg-red-50 text-red-950",
+  medium: "border-amber-300 bg-amber-50 text-amber-950",
+  info: "border-sky-300 bg-sky-50 text-sky-950",
+};
+
 interface Props {
   pin: Pin;
+  flood?: FloodNote | null;
   onClose: () => void;
   onDirectionsTo?: () => void;
   onDirectionsFrom?: () => void;
@@ -34,7 +48,7 @@ function ActionButton({ label, onClick, primary = false }: { label: string; onCl
   );
 }
 
-export default function PlaceCard({ pin, onClose, onDirectionsTo, onDirectionsFrom, onReport }: Props) {
+export default function PlaceCard({ pin, flood, onClose, onDirectionsTo, onDirectionsFrom, onReport }: Props) {
   const title = pin.name || (pin.loading ? "Đang tìm địa chỉ…" : "Điểm đã chọn");
   const rest = addressRest(pin.name, pin.address);
   return (
@@ -57,6 +71,16 @@ export default function PlaceCard({ pin, onClose, onDirectionsTo, onDirectionsFr
           ×
         </button>
       </div>
+      {flood && (
+        <div role="note" aria-label="Thông tin ngập" className={`mt-2 rounded-lg border px-3 py-2 text-sm ${NOTE_TONE[flood.tone]}`}>
+          <p className="font-semibold">{flood.title}</p>
+          {flood.lines.map((line) => (
+            <p key={line} className="mt-0.5">
+              {line}
+            </p>
+          ))}
+        </div>
+      )}
       <div className="mt-3 flex gap-2">
         <ActionButton label="Chỉ đường tới đây" onClick={onDirectionsTo} primary />
         <ActionButton label="Đi từ đây" onClick={onDirectionsFrom} />
