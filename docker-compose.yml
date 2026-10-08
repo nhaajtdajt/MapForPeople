@@ -1,0 +1,36 @@
+# Chạy sản phẩm: docker compose up -d --build   (xem deploy/README.md)
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_GOONG_MAP_KEY: ${VITE_GOONG_MAP_KEY}
+    env_file: .env  # GOONG_API_KEY, GEMINI_API_KEY..., không bao giờ nằm trong ảnh
+    environment:
+      FLOODRISK_DATA: /data
+      REFRESH_MINUTES: "60"
+      FLOODRISK_TEST_TOOLS: ""
+    volumes:
+      - ./data:/data  # mô hình, mạng đường và báo cáo của người dùng nằm ngoài ảnh
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    restart: unless-stopped
+
+  # HTTPS (spec 07, mục 3): chỉ chạy khi gọi với --profile https và đã đặt SITE_DOMAIN trong .env
+  caddy:
+    image: caddy:2
+    profiles: ["https"]
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:-localhost}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    ports:
+      - "80:80"
+      - "443:443"
+    depends_on:
+      - app
+    restart: unless-stopped
+
+volumes:
+  caddy_data:

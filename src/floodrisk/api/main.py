@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.staticfiles import StaticFiles
 
 from floodrisk.api import routes_live, routes_places, routes_risk, routes_route, settings
 from floodrisk.api.context import Context
@@ -21,4 +22,9 @@ def create_app() -> FastAPI:
     routes_places.register(app, ctx)
     routes_route.register(app, ctx)
     routes_live.register(app, ctx)
+    # Bản triển khai chạy một dịch vụ duy nhất: máy chủ phục vụ luôn giao diện đã dựng (spec 07, mục 1.1).
+    # Gắn sau cùng để mọi đường dẫn /api/... vẫn do các hàm ở trên trả lời.
+    dist = settings.web_dist()
+    if (dist / "index.html").exists():
+        app.mount("/", StaticFiles(directory=dist, html=True), name="web")
     return app

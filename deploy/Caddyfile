@@ -1,0 +1,4 @@
+# Caddy tự xin và gia hạn chứng chỉ cho tên miền trong SITE_DOMAIN rồi chuyển tiếp sang máy chủ.
+{$SITE_DOMAIN} {
+	reverse_proxy app:8000
+}

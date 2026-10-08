@@ -1,0 +1,11 @@
+# Những thư viện máy chủ cần lúc chạy (bản triển khai). Cùng phiên bản với requirements.txt.
+# requirements.txt còn thêm các thư viện chỉ dùng để dựng dữ liệu và kiểm thử.
+numpy==2.5.3
+pandas==3.0.6
+pyarrow==25.0.1
+scipy==1.18.1
+shapely==2.1.2
+httpx==0.28.1
+fastapi==0.142.2
+uvicorn[standard]==0.54.0
+pydantic==2.13.5
