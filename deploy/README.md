@@ -17,6 +17,16 @@ Ba điều cần biết về gói miễn phí của Render:
 
 Đổi mã thì chỉ cần push lên nhánh `web`, Render tự dựng lại.
 
+### Mức của mô hình trên Render
+
+Open-Meteo từ chối máy của Render (lỗi 429, vì Render dùng chung địa chỉ mạng), nên máy chủ ở đó không tự tính được trạng thái mưa của mô hình. Một máy ở Việt Nam tính hộ rồi đẩy lên:
+
+1. Đặt cùng một giá trị cho biến `RISK_PUSH_TOKEN` trên Render (mục Environment) và trong `.env` của máy tính hộ.
+2. Trong `.env` của máy tính hộ, đặt `RISK_PUSH_URL=https://mapforpeople.onrender.com`.
+3. Chạy `python tools/ghi_du_lieu.py` trên máy đó. Mỗi 10 phút nó tính mức và đẩy lên; việc này cũng giữ cho máy Render không ngủ.
+
+Máy tính hộ tắt thì bản trên mạng vẫn có mức từ trạm mưa, mực nước Phú An và báo cáo, và ghi rõ trạng thái mưa của mô hình là số liệu cũ hoặc chưa có.
+
 ## Tự chạy trên một máy Ubuntu
 
 Mô hình, mạng đường và báo cáo của người dùng nằm trong thư mục `data/` của máy, gắn vào container.

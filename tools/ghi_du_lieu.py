@@ -190,12 +190,13 @@ def cycle(last_model_hour: int | None) -> int | None:
             last_model_hour = now.hour
         except Exception as exc:
             parts.append(f"mô hình lỗi {type(exc).__name__}")
-        try:
-            pushed = push_model()
-            if pushed:
-                parts.append(pushed)
-        except Exception as exc:
-            parts.append(f"đẩy mức lỗi {type(exc).__name__}")
+    # Đẩy ở mọi lượt, không chỉ đầu giờ: máy chủ miễn phí ngủ sau 15 phút không ai gọi và mất bản tính khi khởi động lại.
+    try:
+        pushed = push_model()
+        if pushed:
+            parts.append(pushed)
+    except Exception as exc:
+        parts.append(f"đẩy mức lỗi {type(exc).__name__}")
     active = (tide is not None and tide >= TIDE_ACTIVE_M) or wettest >= RAIN_ACTIVE_MM
     if active or now.minute < 10:
         try:
