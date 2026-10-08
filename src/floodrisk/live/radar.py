@@ -11,6 +11,11 @@ lần báo rơi vào giờ trạm đo dưới 5 mm; ngưỡng báo động bắt
 radar chỉ bật khi rất chắc; trận mưa to mà radar chỉ thấy ở mức cảnh giác thì trạm đo (30 mm/giờ) mới là nguồn đưa lên báo động.
 Radar ước mưa to thấp hơn trạm đo khoảng 1,4 lần, nên ngưỡng của nó không phải mm của trạm.
 Mới có một ngày dữ liệu: các con số này phải được kiểm lại khi bộ ghi có thêm ngày mưa.
+
+Nền khô: trong 12 km quanh trạm radar, ảnh tô "mưa" cả khi trời khô (cảng Tân Thuận, sông, nhà cao tầng Q7: tới 30 mm/giờ),
+và tối 08/10 toàn bộ 214 tuyến nhóm A bị radar đưa lên báo động đều nằm trên nền đó. 44 trạm đo không bắt được vì chỉ 5 trạm
+ở trong 15 km và cả 5 nằm trên nền thấp. `dry_background()` đọc bản đồ nền dựng từ các giờ không trạm nào mưa
+(tools/dung_nen_kho_radar.py); `hourly_rate` trừ nó đi trước khi so ngưỡng.
 """
 from __future__ import annotations
 
@@ -20,6 +25,8 @@ from pathlib import Path
 import numpy as np
 from scipy.ndimage import uniform_filter
 
+from floodrisk import config
+
 SITE = (10.6589, 106.7286)  # trạm radar Nhà Bè (vĩ độ, kinh độ)
 KM_PER_PX = 0.26
 SHIFT_PX = (-8, -4)  # (cột, hàng) cộng thêm khi đặt một điểm lên ảnh; khớp nhất với trạm đo ngày 08/10
@@ -28,6 +35,7 @@ WATCH_MM_H = 8.0
 ALERT_MM_H = 20.0  # nâng từ 12 tối 08/10: ở mức 12 radar báo động 5.340 tuyến trong khi trạm đo to nhất 13,8 mm/giờ và ba camera chỉ thấy đường ướt
 MIN_IMAGES = 4  # cần ít nhất chừng này ảnh trong giờ qua
 NEAR_SITE_KM = 5.0  # sát trạm radar toàn nhiễu mặt đất
+BACKGROUND_STEP = 0.25  # file nền khô lưu uint8 theo bước này (mm/giờ), tối đa 63,75
 URL = "http://hymetnet.gov.vn/dataout_web/NHB/{d:%Y%m%d}/NHB_{d:%Y%m%d%H%M}_CMAX00.png"
 PALETTE = [(102, 212, 251), (2, 109, 248), (7, 69, 248), (167, 250, 132), (87, 250, 35), (5, 224, 51),
            (255, 216, 0), (255, 166, 0), (253, 129, 19), (255, 28, 0), (204, 0, 113)]  # từ mưa yếu tới mưa mạnh
@@ -68,10 +76,34 @@ def last_hour(folders: list[Path], now: datetime) -> list[Path]:
     return sorted(recent, key=image_time)
 
 
-def hourly_rate(grids: list[np.ndarray]) -> np.ndarray:
-    """Cường độ mưa trung bình của giờ qua (mm/giờ trên thang radar), đã làm mượt trong ô BOX x BOX."""
+def background_path() -> Path:
+    return config.processed_dir("hcm") / "radar_nen_kho.npz"
+
+
+def save_background(background: np.ndarray, path: Path, images: int) -> None:
+    """Ghi nền khô (đã làm mượt ô BOX x BOX) thành file nhỏ: uint8 theo bước BACKGROUND_STEP, nén."""
+    quantised = np.clip(np.round(np.asarray(background, np.float32) / BACKGROUND_STEP), 0, 255).astype(np.uint8)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    np.savez_compressed(path, nen=quantised, buoc=BACKGROUND_STEP, so_anh=images)
+
+
+def dry_background(path: Path | None = None) -> np.ndarray | None:
+    """Nền khô của ảnh radar (mm/giờ, cùng cỡ ảnh), hoặc None khi chưa dựng."""
+    path = path or background_path()
+    if not path.exists():
+        return None
+    with np.load(path) as f:
+        return f["nen"].astype(np.float32) * float(f["buoc"])
+
+
+def hourly_rate(grids: list[np.ndarray], background: np.ndarray | None = None) -> np.ndarray:
+    """Cường độ mưa trung bình của giờ qua (mm/giờ trên thang radar), đã làm mượt trong ô BOX x BOX.
+
+    Có `background` (nền khô, xem `dry_background`) thì trừ đi, không để âm: phần còn lại mới là mưa đang rơi.
+    """
     mean = np.mean([RATE_MM_H[g] for g in grids], axis=0, dtype=np.float32)
-    return uniform_filter(mean, size=BOX, mode="constant")
+    smooth = uniform_filter(mean, size=BOX, mode="constant")
+    return smooth if background is None else np.maximum(smooth - background, 0.0)
 
 
 def states_at(lat, lon, rate: np.ndarray) -> np.ndarray:

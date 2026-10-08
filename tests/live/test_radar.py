@@ -40,6 +40,20 @@ def test_hourly_rate_averages_the_hour_and_smooths_single_pixels():
     assert rate[100, 100] < 1.0 and rate.max() < 1.0  # không đủ để thành cảnh giác
 
 
+def test_dry_background_is_subtracted_before_the_thresholds(tmp_path):
+    wet = np.zeros((60, 60), np.uint8)
+    wet[20:40, 20:40] = 8  # một vùng mưa đều trong cả bốn ảnh
+    plain = radar.hourly_rate([wet] * 4)
+    assert plain[30, 30] > 20
+    clutter = np.full((60, 60), plain[30, 30] - 1.0, np.float32)  # nền khô cao gần bằng: như cảng Tân Thuận
+    assert abs(radar.hourly_rate([wet] * 4, clutter)[30, 30] - 1.0) < 1e-4
+    assert radar.hourly_rate([wet] * 4, np.full((60, 60), 99.0, np.float32)).max() == 0.0  # không bao giờ âm
+    assert radar.dry_background(tmp_path / "khong_co.npz") is None
+    radar.save_background(np.full((60, 60), 2.3, np.float32), tmp_path / "nen.npz", images=3)
+    loaded = radar.dry_background(tmp_path / "nen.npz")
+    assert loaded.shape == (60, 60) and abs(loaded[0, 0] - 2.25) < 1e-6  # lượng tử 0,25 mm/giờ
+
+
 def test_gauges_use_millimetre_thresholds():
     assert local.gauge_state_of(14.0, 14.0) == levels.QUIET  # trước đây 14 mm trong 3 giờ đã là cảnh giác
     assert local.gauge_state_of(15.0, 15.0) == levels.WATCH and local.gauge_state_of(0.0, 30.0) == levels.WATCH

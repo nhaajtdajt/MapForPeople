@@ -19,6 +19,7 @@ from __future__ import annotations
 import json
 import math
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
@@ -55,6 +56,27 @@ def append(path: Path, obj: dict) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "a", encoding="utf-8") as f:
         f.write(json.dumps(obj, ensure_ascii=False, default=str) + "\n")
+
+
+def within(seconds: float, fn, *args):
+    """Chạy một bước với hạn chót. Từng lần gọi mạng đã có giới hạn, nhưng 21:31 tối 08/10 cổng trạm đo giữ kết nối mở
+    hơn một giờ và cả bộ ghi đứng theo. Quá hạn thì bỏ bước đó (luồng kẹt tự chết khi tắt chương trình), chu kỳ đi tiếp."""
+    box: dict = {}
+
+    def run() -> None:
+        try:
+            box["value"] = fn(*args)
+        except BaseException as exc:  # noqa: BLE001  - chuyển nguyên lỗi về luồng chính
+            box["error"] = exc
+
+    worker = threading.Thread(target=run, daemon=True)
+    worker.start()
+    worker.join(seconds)
+    if worker.is_alive():
+        raise TimeoutError(f"quá {seconds:g} giây")
+    if "error" in box:
+        raise box["error"]
+    return box.get("value")
 
 
 def save_radar(day: Path) -> int:
@@ -167,7 +189,8 @@ def radar_step(now: datetime) -> str:
     images = radar.last_hour(folders, utc)
     if len(images) < radar.MIN_IMAGES:
         return f"radar chỉ có {len(images)} ảnh trong giờ qua"
-    rate = radar.hourly_rate([radar.levels(p) for p in images])
+    background = radar.dry_background()
+    rate = radar.hourly_rate([radar.levels(p) for p in images], background)
     routes = pd.read_parquet(fr_config.route_table_path("hcm"), columns=["lat", "lon", "band_rain"])
     state = radar.states_at(routes.lat.to_numpy(), routes.lon.to_numpy(), rate)
     state[routes.band_rain.to_numpy() == 0] = 0  # tuyến mô hình không xếp là dễ ngập do mưa thì không bao giờ có mức do mưa
@@ -175,6 +198,8 @@ def radar_step(now: datetime) -> str:
               "images": len(images), "watch": np.flatnonzero(state == 1).tolist(), "alert": np.flatnonzero(state == 2).tolist()}
     (LIVE / "radar_state_hcm.json").write_text(json.dumps(record), encoding="utf-8")
     note = f"radar {len(images)} ảnh: {len(record['watch'])} tuyến cảnh giác, {len(record['alert'])} báo động"
+    if background is None:
+        note += " (CHƯA TRỪ NỀN KHÔ: chạy tools/dung_nen_kho_radar.py)"
 
     url, token = env_value("RISK_PUSH_URL").rstrip("/"), env_value("RISK_PUSH_TOKEN")
     if not url or not token:
@@ -232,29 +257,29 @@ def cycle(last_model_hour: int | None) -> int | None:
     day = LIVE / f"{now:%Y-%m-%d}"
     parts = []
     try:
-        parts.append(f"radar +{save_radar(day)}")
+        parts.append(f"radar +{within(120, save_radar, day)}")
     except Exception as exc:
         parts.append(f"radar lỗi {type(exc).__name__}")
     try:
-        parts.append(radar_step(now))
+        parts.append(within(600, radar_step, now))  # ba lần Gemini đọc camera có thể mất tới ba phút
     except Exception as exc:
         parts.append(f"radar lỗi {type(exc).__name__}: {exc}")
     tide, wettest = None, 0.0
     try:
-        tide, wettest = save_hydro(day, now)
+        tide, wettest = within(180, save_hydro, day, now)
         parts.append(f"triều {tide:.2f} m" if tide is not None else "triều ?")
         parts.append(f"mưa giờ qua lớn nhất {wettest:g} mm")
     except Exception as exc:
         parts.append(f"hydro lỗi {type(exc).__name__}")
     if last_model_hour != now.hour:
         try:
-            parts.append("mô hình " + save_model(day, now))
+            parts.append("mô hình " + within(180, save_model, day, now))
             last_model_hour = now.hour
         except Exception as exc:
             parts.append(f"mô hình lỗi {type(exc).__name__}")
     # Đẩy ở mọi lượt, không chỉ đầu giờ: máy chủ miễn phí ngủ sau 15 phút không ai gọi và mất bản tính khi khởi động lại.
     try:
-        pushed = push_model()
+        pushed = within(120, push_model)
         if pushed:
             parts.append(pushed)
     except Exception as exc:
@@ -262,7 +287,7 @@ def cycle(last_model_hour: int | None) -> int | None:
     active = (tide is not None and tide >= TIDE_ACTIVE_M) or wettest >= RAIN_ACTIVE_MM
     if active or now.minute < 10:
         try:
-            ok, total = save_cameras(day, now)
+            ok, total = within(300, save_cameras, day, now)
             parts.append(f"camera {ok}/{total}" + (" (đang có mưa hoặc triều cao)" if active else ""))
         except Exception as exc:
             parts.append(f"camera lỗi {type(exc).__name__}")
