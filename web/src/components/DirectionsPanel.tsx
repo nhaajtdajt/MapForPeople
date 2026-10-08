@@ -176,7 +176,7 @@ export default function DirectionsPanel({ directions, near }: Props) {
                 <li key={`${selected.id}-${index}`} className="flex gap-3 rounded-lg bg-slate-50 px-3 py-2 text-sm">
                   <span aria-hidden="true" className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white font-semibold text-blue-800 ring-1 ring-slate-200">{index + 1}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="font-medium text-slate-900">{TURN_LABELS[step.turn] ?? "Tiếp tục"} · {step.name}</p>
+                    <p className="font-medium text-slate-900">{step.turn === "text" ? step.name : `${TURN_LABELS[step.turn] ?? "Tiếp tục"} · ${step.name}`}</p>
                     <p className="mt-0.5 text-slate-600">{formatDistance(step.distance_m)} · {formatDuration(step.duration_s)}</p>
                   </div>
                 </li>

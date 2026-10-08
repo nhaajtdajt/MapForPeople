@@ -148,7 +148,7 @@ def register(app: FastAPI, ctx: Context) -> None:
                 coords = decode_polyline(g["polyline"])
                 seen = floodcost.exposure(edges_along(graph, city, coords), graph.length_m, flood) if flood is not None else None
                 items.append({"kind": "fastest" if not items else "alternative", "engine": "goong", "estimated": False,
-                              "distance_m": round(float(g["distance_m"]), 1), "duration_s": round(g["duration_s"]), "flood": seen, "steps": [],
+                              "distance_m": round(float(g["distance_m"]), 1), "duration_s": round(g["duration_s"]), "flood": seen, "steps": g.get("steps", []),
                               "geometry": {"type": "LineString", "coordinates": [[c[0], c[1]] for c in coords]}})
             if avoid is not None:
                 seen = floodcost.exposure(avoid.edges, graph.length_m, flood)

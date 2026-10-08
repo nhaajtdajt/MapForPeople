@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import httpx
 
 BASE = "https://rsapi.goong.io/v2"
@@ -85,6 +87,10 @@ class Goong:
                 "distance_m": sum(leg["distance"]["value"] for leg in legs),
                 "duration_s": sum(leg["duration"]["value"] for leg in legs),
                 "polyline": polyline["points"] if isinstance(polyline, dict) else polyline,
+                # Chỉ dẫn từng bước của Goong, đã là câu tiếng Việt hoàn chỉnh ("Rẽ phải vào Lê Lai").
+                "steps": [{"name": re.sub(r"<[^>]+>", "", step.get("html_instructions") or "").strip(),
+                           "distance_m": float(step["distance"]["value"]), "duration_s": float(step["duration"]["value"]), "turn": "text"}
+                          for leg in legs for step in leg.get("steps") or []],
             })
         return routes
 

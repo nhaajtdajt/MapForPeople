@@ -63,7 +63,7 @@ export function addRouteLayers(map: MapLibreMap): void {
       type: "circle",
       source: ENDPOINT_SOURCE,
       paint: {
-        "circle-radius": 9,
+        "circle-radius": 14,
         "circle-color": ["match", ["get", "end"], "origin", "#15803d", "#1d4ed8"],
         "circle-stroke-color": "#ffffff",
         "circle-stroke-width": 3,
@@ -71,6 +71,27 @@ export function addRouteLayers(map: MapLibreMap): void {
     },
     firstSymbol,
   );
+  // Chữ "Đi" và "Đến" trong hai chấm đầu mút, để nhìn là biết lộ trình chạy theo chiều nào.
+  // Phông chữ lấy của bản đồ nền (chỉ nó có sẵn bộ chữ trên máy chủ ô bản đồ); không tìm thấy thì chỉ còn hai màu.
+  const font = map
+    .getStyle()
+    .layers.map((layer) => (layer.type === "symbol" ? layer.layout?.["text-font"] : undefined))
+    .find((value): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string"));
+  if (font) {
+    map.addLayer({
+      id: `${ENDPOINT_CIRCLES}-labels`,
+      type: "symbol",
+      source: ENDPOINT_SOURCE,
+      layout: {
+        "text-field": ["match", ["get", "end"], "origin", "Đi", "Đến"],
+        "text-font": font,
+        "text-size": 12,
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+      },
+      paint: { "text-color": "#ffffff" },
+    });
+  }
 }
 
 function routeFeatures(routes: RouteOption[]): FeatureCollection<LineString, { route_id: number }> {
