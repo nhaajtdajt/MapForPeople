@@ -8,8 +8,9 @@ export function riskLine(risk: RiskState | null): string {
   if (!risk) return "Chưa có mức nguy cơ";
   const now = risk.hours[0];
   const tide = risk.local?.tide ? ` (Phú An ${risk.local.tide.level_m.toFixed(2).replace(".", ",")} m)` : "";
-  const text = `Mưa: ${STATE_LABEL[risk.states.rain]} · Triều: ${STATE_LABEL[risk.states.tide]}${tide} · ${clockOf(now.valid_time)}`;
-  return risk.stale ? `${text} · số liệu cũ` : text;
+  const rain = risk.rain_missing ? "chưa có số liệu" : STATE_LABEL[risk.states.rain];
+  const text = `Mưa: ${rain} · Triều: ${STATE_LABEL[risk.states.tide]}${tide} · ${clockOf(now.valid_time)}`;
+  return risk.stale && !risk.rain_missing ? `${text} · số liệu cũ` : text;
 }
 
 /** Nội dung ô thông tin ngập trên thẻ địa điểm, từ thứ người dùng vừa chạm trúng. */

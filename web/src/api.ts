@@ -77,6 +77,8 @@ export interface RiskState {
   generated_at: string;
   rain_source: string;
   stale: boolean;
+  /** Chưa lấy được mưa cho mô hình lần nào: trạng thái mưa của thành phố là chưa biết. */
+  rain_missing: boolean;
   error: string | null;
   hours: RiskHour[];
   /** Trạng thái đang áp cho cả thành phố: triều đã xét mực nước Phú An. */

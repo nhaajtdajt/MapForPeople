@@ -114,6 +114,18 @@ class CityModel:
             hours.append(Hour(window["valid_time"], rain, self._tide(window["valid_time"])))
         return Snapshot(self.city, config.MODEL_VERSION, now, source, tuple(hours))
 
+    def snapshot_without_rain(self, at=None) -> Snapshot:
+        """Bản tính khi chưa lấy được mưa cho mô hình: triều vẫn tính đủ (không cần mạng), mưa để ở trạng thái yên và đánh dấu thiếu.
+
+        Dùng lúc máy chủ vừa khởi động mà nguồn mưa lỗi, để trạm mưa, mực nước Phú An và báo cáo vẫn nâng được mức.
+        """
+        now = pd.Timestamp.now(tz=trigger.TZ)
+        at = now if at is None else pd.Timestamp(at)
+        at = (at.tz_localize(trigger.TZ) if at.tzinfo is None else at.tz_convert(trigger.TZ)).floor("h")
+        hours = tuple(Hour(at + pd.Timedelta(hours=h), Cause(levels.QUIET, 0.0, {"missing": True}), self._tide(at + pd.Timedelta(hours=h)))
+                      for h in trigger.HORIZONS)
+        return Snapshot(self.city, config.MODEL_VERSION, now, "chưa lấy được mưa cho mô hình", hours)
+
     def _tide(self, valid_time: pd.Timestamp) -> Cause:
         if self.astro is None:
             return Cause(levels.QUIET, 0.0, {})

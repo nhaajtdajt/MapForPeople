@@ -118,13 +118,25 @@ def test_a_failed_refresh_keeps_the_last_result_and_says_so(model_data):
     assert client.get("/api/health").json()["last_error"] == body["error"]
 
 
-def test_no_result_at_all_is_a_503_with_the_reason(model_data):
-    def fetch(city, model):
-        raise RuntimeError("mất mạng")
+def test_rain_source_down_at_startup_still_gives_tide_and_reports(model_data):
+    calls = {"fail": True}
+    good = _rain(99.0)
 
-    client, _ = _client(fetch)
-    response = client.get("/api/risk")
-    assert response.status_code == 503 and "mất mạng" in response.json()["detail"]
+    def fetch(city, model):
+        if calls["fail"]:
+            raise RuntimeError("mất mạng")
+        return good(city, model)
+
+    client, ctx = _client(fetch)
+    body = client.get("/api/risk").json()
+    assert body["rain_missing"] is True and body["stale"] is True and "mất mạng" in body["error"]
+    assert body["states"] == {"rain": "quiet", "tide": "quiet"} and body["counts_now"] == {"high": 0, "medium": 0}
+    assert body["hours"][0]["tide"]["astro_m"] == 3.2  # triều không cần mạng nên vẫn có
+
+    calls["fail"] = False
+    ctx.risk_failures.clear()  # coi như đã qua thời gian chờ thử lại
+    body = client.get("/api/risk").json()
+    assert body["rain_missing"] is False and body["stale"] is False and body["states"]["rain"] == "alert"
 
 
 def test_city_without_model_files_is_a_404(model_data):

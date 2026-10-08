@@ -129,6 +129,8 @@ def register(app: FastAPI, ctx: Context) -> None:
             "generated_at": snapshot.generated_at.isoformat(timespec="seconds"),
             "rain_source": snapshot.rain_source,
             "stale": error is not None,
+            # Đúng khi chưa lấy được mưa cho mô hình lần nào: trạng thái mưa của thành phố khi đó là chưa biết, không phải yên.
+            "rain_missing": bool(now.rain.inputs.get("missing")),
             "error": error,
             "hours": [{"valid_time": hour.valid_time.isoformat(), "rain": _cause(hour.rain), "tide": _cause(hour.tide),
                        "counts": model.counts(hour)} for hour in snapshot.hours],

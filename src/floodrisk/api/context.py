@@ -76,15 +76,21 @@ class Context:
             now = time.monotonic()
             max_age_s = max(settings.refresh_minutes(), 10) * 60
             fresh = held is not None and now - held[1] < max_age_s and held[0].hours[0].valid_time == ports.current_hour()
-            if fresh or (failure is not None and now - failure[1] < RISK_RETRY_S):
-                return (held[0] if held else None), (None if fresh else failure[0])
+            if fresh or (failure is not None and now - failure[1] < RISK_RETRY_S and held is not None):
+                return held[0], (None if fresh else failure[0])
             try:
                 snapshot = model.snapshot(fetch=self.rain_fetch) if self.rain_fetch else model.snapshot()
             except Exception as exc:  # mọi lỗi của nguồn mưa: giữ bản cũ thay vì làm hỏng cả bản đồ
                 message = f"Chưa cập nhật được mức nguy cơ: {type(exc).__name__}: {exc}"
                 self.risk_failures[city] = (message, now)
                 self.last_error = message
-                return (held[0] if held else None), message
+                if held is None or held[0].hours[0].rain.inputs.get("missing"):
+                    # Chưa có bản tính đủ nào: dựng bản thiếu mưa (triều vẫn đủ), để trạm mưa, Phú An và báo cáo vẫn nâng được mức.
+                    try:
+                        held = self.snapshots[city] = (model.snapshot_without_rain(), float("-inf"))
+                    except Exception:
+                        return None, message
+                return held[0], message
             self.snapshots[city] = (snapshot, now)
             self._save_risk(city, snapshot)
             self.risk_failures.pop(city, None)
