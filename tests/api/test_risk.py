@@ -180,3 +180,23 @@ def test_another_machine_can_push_the_model_result_with_the_token(model_data, mo
     body = client.get("/api/risk").json()
     assert body["rain_missing"] is False and body["stale"] is False and body["states"]["rain"] == "alert"
     assert body["counts_now"] == {"high": 5, "medium": 15}
+
+
+def test_local_sources_are_reapplied_when_a_new_model_result_arrives(model_data, monkeypatch):
+    """Lỗi ngày 08/10 trên Render: bản tính được đẩy lên báo động, nhưng số đo tại chỗ tính từ bản thiếu mưa vẫn được dùng lại."""
+    from types import SimpleNamespace
+
+    from floodrisk.api import ports
+
+    def down(city, model):
+        raise RuntimeError("429")
+
+    client, ctx = _client(down)
+    ctx.hydro_sources["hcm"] = SimpleNamespace(rain_gauges=lambda: [], gauge_hours=lambda g: [], tide_point=lambda t: (0.5, "measured"))
+    monkeypatch.setenv("RISK_PUSH_TOKEN", "ma-thu")
+    assert client.get("/api/risk").json()["counts_now"] == {"high": 0, "medium": 0}  # bản thiếu mưa
+
+    record = ports.to_record(ctx.model("hcm").snapshot(fetch=_rain(99.0)))
+    client.post("/api/risk/snapshot", json={"city": "hcm", "record": record}, headers={"X-Push-Token": "ma-thu"})
+    body = client.get("/api/risk").json()
+    assert body["states"]["rain"] == "alert" and body["counts_now"] == {"high": 5, "medium": 15} and body["overrides"] == {}

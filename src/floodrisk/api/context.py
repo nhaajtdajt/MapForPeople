@@ -31,7 +31,7 @@ class Context:
     snapshots: dict = field(default_factory=dict)  # thành phố -> (Snapshot, lúc tính theo time.monotonic)
     risk_failures: dict = field(default_factory=dict)  # thành phố -> (lời báo lỗi, lúc hỏng)
     hydro_sources: dict = field(default_factory=dict)  # thành phố -> nguồn trạm mưa và triều; trống thì chỉ dùng mô hình
-    locals: dict = field(default_factory=dict)  # thành phố -> (Local, lúc đọc, giờ của bản mô hình đã dùng)
+    locals: dict = field(default_factory=dict)  # thành phố -> (Local, lúc đọc, bản tính của mô hình đã dùng)
     edge_routes: dict = field(default_factory=dict)  # thành phố -> cạnh gắn vào tuyến nào
     _local_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _graph_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
@@ -135,10 +135,11 @@ class Context:
         with self._local_lock:
             held = self.locals.get(city)
             hour = snapshot.hours[0]
-            if held is not None and time.monotonic() - held[1] < LOCAL_TTL_S and held[2] == hour.valid_time:
+            # Số đo tại chỗ được áp lên đúng một bản tính của mô hình: có bản tính mới (kể cả do máy khác đẩy lên) thì tính lại.
+            if held is not None and time.monotonic() - held[1] < LOCAL_TTL_S and held[2] is snapshot:
                 return held[0]
             local = live_local.read(self.model(city), hour, source)
-            self.locals[city] = (local, time.monotonic(), hour.valid_time)
+            self.locals[city] = (local, time.monotonic(), snapshot)
             return local
 
     def route_state(self, city: str):
