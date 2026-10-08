@@ -12,6 +12,7 @@ from floodrisk.live import cameras, reports
 
 CAMERA_CITY = "hcm"  # cổng camera chỉ có TP.HCM
 CAMERA_CONFIDENCE = 0.75  # Gemini phải chắc từng này thì lượt đọc mới thành báo cáo
+CLEAR_RADIUS_M = 500.0  # camera thấy đường không ngập thì hạ cả các tuyến nhóm A trong bán kính này (cùng một ô mưa, cùng cống); thấy ngập chỉ tính tuyến có camera
 DEPTH_LABEL = {"light": "dưới 10 cm", "medium": "10 tới 30 cm", "high": "trên 30 cm"}
 
 
@@ -52,7 +53,8 @@ def register(app: FastAPI, ctx: Context) -> None:
 
     @app.post("/api/cameras/{cam_id}/read")
     def camera_read(cam_id: str):
-        """Gemini đọc camera này (mất khoảng nửa phút). Đọc thấy ngập hoặc khô đủ chắc thì thành một báo cáo trên tuyến có camera."""
+        """Gemini đọc camera này (mất khoảng nửa phút). Đọc đủ chắc thì thành báo cáo: thấy ngập là trên tuyến có camera,
+        thấy không ngập là trên mọi tuyến nhóm A trong CLEAR_RADIUS_M quanh camera."""
         cam = next((c for c in cameras.registry() if c["id"] == cam_id), None)
         if cam is None:
             raise HTTPException(404, "Không có camera này")
@@ -60,17 +62,21 @@ def register(app: FastAPI, ctx: Context) -> None:
             reading = cameras.read(cam)
         except (cameras.NoKey, cameras.OutOfQuota) as exc:
             raise HTTPException(503, str(exc)) from None
-        report = None
+        report, touched = None, 0
         sure = reading.get("state") == "ok" and reading.get("confidence", 0) >= CAMERA_CONFIDENCE
         if sure and not reading.get("reported"):
             found = ctx.route_at(CAMERA_CITY, cam["lat"], cam["lon"])
-            if found is not None:
-                row, route_id, _ = found
-                status = "flooded" if reading["flooded"] else "clear"
-                report = reports.add(settings.db_path(), CAMERA_CITY, row, route_id, cam["lat"], cam["lon"], status, reading.get("depth"),
-                                     f"camera:{cam_id}", source="camera", note=reading.get("evidence"))
+            targets = [found[:2]] if found is not None else []
+            if not reading["flooded"]:
+                targets += [t for t in ctx.routes_near(CAMERA_CITY, cam["lat"], cam["lon"], CLEAR_RADIUS_M) if t[0] != (found[0] if found else -1)]
+            status = "flooded" if reading["flooded"] else "clear"
+            for row, route_id in targets:
+                added = reports.add(settings.db_path(), CAMERA_CITY, row, route_id, cam["lat"], cam["lon"], status, reading.get("depth"),
+                                    f"camera:{cam_id}", source="camera", note=reading.get("evidence"))
+                report, touched = report or added, touched + 1
+            if targets:
                 reading["reported"] = True  # kết quả được giữ vài phút: không ghi hai báo cáo cho cùng một lượt đọc
-        return {"camera": {"id": cam["id"], "name": cam["name"]}, "reading": reading, "report": report}
+        return {"camera": {"id": cam["id"], "name": cam["name"]}, "reading": reading, "report": report, "routes": touched}
 
     @app.post("/api/reports")
     def report_add(body: ReportIn):

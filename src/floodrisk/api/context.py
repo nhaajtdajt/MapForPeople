@@ -226,6 +226,14 @@ class Context:
         name = routes["name"].iloc[row]
         return row, str(routes.route_id.iloc[row]), name if isinstance(name, str) else ""
 
+    def routes_near(self, city: str, lat: float, lon: float, max_m: float) -> list[tuple[int, str]]:
+        """Các tuyến nhóm A (dễ ngập do mưa) trong `max_m` quanh một điểm: (dòng, mã tuyến). Rỗng khi thành phố chưa có mô hình."""
+        model = self.model(city)
+        if model is None:
+            return []
+        rows = live_local.routes_within(model.routes, lat, lon, max_m)
+        return [(int(r), str(model.routes.route_id.iloc[int(r)])) for r in rows]
+
     def flood_view(self, city: str):
         """Mức ngập trên từng cạnh của mạng đường, cho tìm đường tránh ngập. None khi thành phố chưa có đủ dữ liệu."""
         state = self.route_state(city)

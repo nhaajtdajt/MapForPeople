@@ -22,8 +22,9 @@ def _rate_with_rain_at(lat, lon, mm_h, size=2310):
 
 def test_states_follow_the_two_radar_thresholds_at_the_right_place():
     spots = np.array([[10.80, 106.70], [10.90, 106.60], [10.75, 106.65]])
-    rate = _rate_with_rain_at(10.80, 106.70, 21.0) + _rate_with_rain_at(10.90, 106.60, 13.0)  # 13 mm/giờ giờ chỉ là cảnh giác
+    rate = _rate_with_rain_at(10.80, 106.70, 36.0) + _rate_with_rain_at(10.90, 106.60, 21.0)  # 21 trên thang radar ≈ 30 mm trạm: cảnh giác
     assert list(radar.states_at(spots[:, 0], spots[:, 1], rate)) == [levels.ALERT, levels.WATCH, levels.QUIET]
+    assert radar.states_at([10.80], [106.70], _rate_with_rain_at(10.80, 106.70, 27.0))[0] == levels.WATCH  # ≈ 38 mm trạm: chưa phải báo động
 
 
 def test_points_next_to_the_radar_or_outside_the_image_are_never_flagged():
@@ -55,6 +56,7 @@ def test_dry_background_is_subtracted_before_the_thresholds(tmp_path):
 
 
 def test_gauges_use_millimetre_thresholds():
-    assert local.gauge_state_of(14.0, 14.0) == levels.QUIET  # trước đây 14 mm trong 3 giờ đã là cảnh giác
-    assert local.gauge_state_of(15.0, 15.0) == levels.WATCH and local.gauge_state_of(0.0, 30.0) == levels.WATCH
-    assert local.gauge_state_of(30.0, 30.0) == levels.ALERT and local.gauge_state_of(5.0, 50.0) == levels.ALERT
+    assert local.gauge_state_of(29.6, 29.6) == levels.QUIET  # tối 08/10: 29,6 mm/giờ, camera quanh trạm chỉ thấy đường ướt
+    assert local.gauge_state_of(30.0, 30.0) == levels.WATCH and local.gauge_state_of(0.0, 50.0) == levels.WATCH
+    assert local.gauge_state_of(50.0, 50.0) == levels.ALERT and local.gauge_state_of(5.0, 80.0) == levels.ALERT
+    assert local.gauge_state_of(49.0, 79.0) == levels.WATCH

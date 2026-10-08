@@ -4,11 +4,15 @@ Mô hình 2 chỉ cho một trạng thái mưa chung cả thành phố, tính t�
 mưa to chỉ rơi ở ngoại thành, và bản đồ đỏ gần hết nội thành. Vì vậy trạng thái mưa của từng tuyến lấy từ trạm đo:
 tuyến nằm trong RADIUS_M quanh trạm nhận trạng thái của trạm, tính bằng ngưỡng mm ghi ở GAUGE_WATCH và GAUGE_ALERT.
 Công thức của Mô hình 2 không dùng cho trạm: nó được chỉnh trên mưa dự báo, đem mưa đo tại một điểm vào thì 14 mm trong
-3 giờ đã thành "cảnh giác". Ngưỡng 30 mm trong 1 giờ có căn cứ từ ngày 01/10 và 07/10 (các trạm vượt mức đó trùng với
-những khu báo chí đưa tin ngập); các ngưỡng còn lại là giả định, chưa hiệu chỉnh.
+3 giờ đã thành "cảnh giác".
+Ngưỡng mm (chốt tối 08/10, phương án E): 30 mm/giờ là mức "có thể ngập" (vàng) chứ không phải "ngập" — ngày 01/10 và 07/10
+các trạm vượt 30 mm trùng với khu báo chí đưa tin ngập, nhưng tối 08/10 trạm Nguyễn Thiện Thuật đo 29,6 mm/giờ mà 8 camera
+trong 1,7 km quanh đó chỉ thấy đường ướt. Mức "rất có thể ngập" (đỏ) đặt ở 50 mm/giờ hoặc 80 mm/3 giờ: con số đặt ra từ
+hai ngày quan sát, chưa hiệu chỉnh; bộ ghi (tools/ghi_du_lieu.py) đang gom trạm, radar và ảnh camera mỗi 10 phút để chỉnh lại.
+Bán kính RADIUS_M là cỡ một ô mưa dông; 5 km trước đây làm một trạm tô 2.215 tuyến nhóm A.
 Tuyến không gần trạm nào đang mưa thì trạng thái mưa là yên, dù mô hình báo gì cho cả thành phố (quyết định của chủ dự án
 ngày 08/10, thay cho quy tắc "chỉ nâng" ở ghi chú 11, QĐ4). Mực nước Phú An từ báo động 1 nâng trạng thái triều lên
-cảnh giác, từ báo động 2 lên báo động. Ba con số RADIUS_M, TIDE_WATCH_M, TIDE_ALERT_M do người làm web đặt, chưa hiệu chỉnh.
+cảnh giác, từ báo động 2 lên báo động. TIDE_WATCH_M, TIDE_ALERT_M do người làm web đặt, chưa hiệu chỉnh.
 """
 from __future__ import annotations
 
@@ -20,9 +24,9 @@ import pandas as pd
 
 from floodrisk.model import levels
 
-RADIUS_M = 5000.0
-GAUGE_WATCH = (15.0, 30.0)  # mm trong giờ gần nhất, mm trong 3 giờ: đạt một trong hai là cảnh giác
-GAUGE_ALERT = (30.0, 50.0)  # tương tự, cho báo động
+RADIUS_M = 3000.0
+GAUGE_WATCH = (30.0, 50.0)  # mm trong giờ gần nhất, mm trong 3 giờ: đạt một trong hai là cảnh giác
+GAUGE_ALERT = (50.0, 80.0)  # tương tự, cho báo động
 TIDE_WATCH_M = 1.40  # báo động 1 tại Phú An
 TIDE_ALERT_M = 1.50  # báo động 2 tại Phú An
 MAX_GAUGE_LAG = timedelta(hours=2)  # trạm im lặng lâu hơn thế thì không dùng
@@ -70,6 +74,12 @@ def tide_state_of(level_m: float) -> int:
 def _distance_m(lat, lon, lat0: float, lon0: float) -> np.ndarray:
     kx = 111_320.0 * np.cos(np.radians(lat0))
     return np.hypot((np.asarray(lon) - lon0) * kx, (np.asarray(lat) - lat0) * 110_540.0)
+
+
+def routes_within(routes: pd.DataFrame, lat: float, lon: float, max_m: float, min_band: int = 2) -> np.ndarray:
+    """Dòng của những tuyến có nhóm mưa từ `min_band` nằm trong `max_m` quanh một điểm (camera thấy gì thì nói cho cả khu nó nhìn)."""
+    near = _distance_m(routes.lat.to_numpy(float), routes.lon.to_numpy(float), lat, lon) <= max_m
+    return np.flatnonzero(near & (routes.band_rain.to_numpy() >= min_band))
 
 
 def read(model, hour, source, now: datetime | None = None) -> Local:

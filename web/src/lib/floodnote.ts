@@ -49,7 +49,7 @@ export function floodNote(hit: MapHit | null, now: RiskHour | null, risk: RiskSt
   if (own !== undefined && !reported) {
     lines.length = 0;
     const seen = risk?.radar && (risk.radar.watch.includes(hit.id) || risk.radar.alert.includes(hit.id));
-    const source = seen ? `Radar lúc ${clockInVietnam(risk.radar!.image_time)} thấy mưa lớn tại đây` : "Trạm đo mưa trong 5 km quanh tuyến này đang ghi nhận mưa lớn";
+    const source = seen ? `Radar lúc ${clockInVietnam(risk.radar!.image_time)} thấy mưa lớn tại đây` : "Trạm đo mưa trong 3 km quanh tuyến này đang ghi nhận mưa lớn";
     if (hit.route.br > 0) lines.push(`${source}, và mô hình xếp tuyến này vào nhóm dễ ngập do mưa.`);
     if (hit.route.hr + hit.route.ht > 0) lines.push(`Từng có ghi nhận ngập trước 2025: ${hit.route.hr + hit.route.ht} ngày.`);
   }

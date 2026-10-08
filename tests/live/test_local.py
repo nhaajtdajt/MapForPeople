@@ -44,7 +44,12 @@ def test_silent_gauge_is_ignored():
     assert local.gauge_inputs(hours, NOW) is None
 
 
-def test_heavy_rain_at_a_gauge_raises_only_routes_within_five_km():
+def test_routes_within_picks_flood_prone_routes_inside_the_radius():
+    routes = pd.DataFrame({"lat": [10.80, 10.802, 10.802, 10.85], "lon": [106.70, 106.70, 106.70, 106.70], "band_rain": [2, 2, 1, 2]})
+    assert list(local.routes_within(routes, 10.80, 106.70, 500.0)) == [0, 1]  # dòng 2 là nhóm B, dòng 3 cách 5,5 km
+
+
+def test_heavy_rain_at_a_gauge_raises_only_routes_within_the_radius():
     found = local.read(_model(), _hour(), _source(33.0, 0.9), NOW)  # 99 mm trong 3 giờ tại trạm: báo động
     assert found.gauges[0]["state"] == levels.ALERT and found.errors == []
     assert list(found.rain_state) == [2, 2, 0]
