@@ -22,7 +22,7 @@ def _rate_with_rain_at(lat, lon, mm_h, size=2310):
 
 def test_states_follow_the_two_radar_thresholds_at_the_right_place():
     spots = np.array([[10.80, 106.70], [10.90, 106.60], [10.75, 106.65]])
-    rate = _rate_with_rain_at(10.80, 106.70, 13.0) + _rate_with_rain_at(10.90, 106.60, 9.0)
+    rate = _rate_with_rain_at(10.80, 106.70, 21.0) + _rate_with_rain_at(10.90, 106.60, 13.0)  # 13 mm/giờ giờ chỉ là cảnh giác
     assert list(radar.states_at(spots[:, 0], spots[:, 1], rate)) == [levels.ALERT, levels.WATCH, levels.QUIET]
 
 

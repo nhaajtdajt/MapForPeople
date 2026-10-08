@@ -7,7 +7,9 @@
 
 Vị trí đặt ảnh lên bản đồ (KM_PER_PX, SHIFT_PX) và hai ngưỡng được chỉnh theo 44 trạm đo mưa trên dữ liệu ngày 08/10/2026
 (144 ảnh, 1.056 cặp trạm-giờ): ngưỡng cảnh giác bắt 15 trong 16 giờ trạm đo từ 15 mm và 7 trong 7 giờ từ 30 mm, với 17 trong 45
-lần báo rơi vào giờ trạm đo dưới 5 mm. Radar ước mưa to thấp hơn trạm đo khoảng 1,4 lần, nên ngưỡng của nó không phải mm của trạm.
+lần báo rơi vào giờ trạm đo dưới 5 mm; ngưỡng báo động bắt 6 trong 16 và 2 trong 7, không lần nào báo nhầm. Tức báo động của
+radar chỉ bật khi rất chắc; trận mưa to mà radar chỉ thấy ở mức cảnh giác thì trạm đo (30 mm/giờ) mới là nguồn đưa lên báo động.
+Radar ước mưa to thấp hơn trạm đo khoảng 1,4 lần, nên ngưỡng của nó không phải mm của trạm.
 Mới có một ngày dữ liệu: các con số này phải được kiểm lại khi bộ ghi có thêm ngày mưa.
 """
 from __future__ import annotations
@@ -23,7 +25,7 @@ KM_PER_PX = 0.26
 SHIFT_PX = (-8, -4)  # (cột, hàng) cộng thêm khi đặt một điểm lên ảnh; khớp nhất với trạm đo ngày 08/10
 BOX = 9  # ô lấy trung bình quanh mỗi vị trí, khoảng 2,3 km
 WATCH_MM_H = 8.0
-ALERT_MM_H = 12.0
+ALERT_MM_H = 20.0  # nâng từ 12 tối 08/10: ở mức 12 radar báo động 5.340 tuyến trong khi trạm đo to nhất 13,8 mm/giờ và ba camera chỉ thấy đường ướt
 MIN_IMAGES = 4  # cần ít nhất chừng này ảnh trong giờ qua
 NEAR_SITE_KM = 5.0  # sát trạm radar toàn nhiễu mặt đất
 URL = "http://hymetnet.gov.vn/dataout_web/NHB/{d:%Y%m%d}/NHB_{d:%Y%m%d%H%M}_CMAX00.png"
