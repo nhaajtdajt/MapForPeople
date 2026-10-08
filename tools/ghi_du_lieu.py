@@ -124,6 +124,31 @@ def save_model(day: Path, now: datetime) -> str:
     return ", ".join(summary)
 
 
+def env_value(name: str) -> str:
+    env = ROOT / ".env"
+    if env.exists():
+        for line in env.read_text(encoding="utf-8-sig").splitlines():
+            if line.startswith(name + "="):
+                return line.split("=", 1)[1].strip()
+    return ""
+
+
+def push_model() -> str:
+    """Tính mức của mô hình cho TP.HCM rồi đẩy lên máy chủ đang chạy trên mạng, nơi không gọi được Open-Meteo.
+
+    Chỉ chạy khi .env có RISK_PUSH_URL và RISK_PUSH_TOKEN (cùng giá trị với biến RISK_PUSH_TOKEN đặt trên máy chủ).
+    """
+    url, token = env_value("RISK_PUSH_URL"), env_value("RISK_PUSH_TOKEN")
+    if not url or not token:
+        return ""
+    from floodrisk.model.live import CityModel, to_record
+
+    record = to_record(CityModel("hcm").snapshot())
+    r = httpx.post(url.rstrip("/") + "/api/risk/snapshot", json={"city": "hcm", "record": record},
+                   headers={"X-Push-Token": token}, timeout=60)
+    return f"đẩy mức lên máy chủ: HTTP {r.status_code}"
+
+
 def save_cameras(day: Path, now: datetime) -> tuple[int, int]:
     wl = json.loads((LIVE / "watchlist.json").read_text(encoding="utf-8"))["cameras"]
     folder = day / "cams" / f"{now:%H%M}"
@@ -165,6 +190,12 @@ def cycle(last_model_hour: int | None) -> int | None:
             last_model_hour = now.hour
         except Exception as exc:
             parts.append(f"mô hình lỗi {type(exc).__name__}")
+        try:
+            pushed = push_model()
+            if pushed:
+                parts.append(pushed)
+        except Exception as exc:
+            parts.append(f"đẩy mức lỗi {type(exc).__name__}")
     active = (tide is not None and tide >= TIDE_ACTIVE_M) or wettest >= RAIN_ACTIVE_MM
     if active or now.minute < 10:
         try:

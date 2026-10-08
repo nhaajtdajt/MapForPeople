@@ -161,3 +161,22 @@ def test_flood_points_skip_rows_that_could_not_be_located(model_data):
     body = client.get("/api/risk/points").json()
     assert [f["properties"]["place"] for f in body["features"]] == ["Ngã tư thử"]
     assert body["features"][0]["geometry"]["coordinates"] == [106.7, 10.78] and body["features"][0]["properties"]["cause"] == "rain"
+
+
+def test_another_machine_can_push_the_model_result_with_the_token(model_data, monkeypatch):
+    from floodrisk.api import ports
+
+    def down(city, model):
+        raise RuntimeError("429")
+
+    client, ctx = _client(down)
+    record = ports.to_record(ctx.model("hcm").snapshot(fetch=_rain(99.0)))
+    assert client.post("/api/risk/snapshot", json={"city": "hcm", "record": record}).status_code == 404  # chưa đặt mã: không nhận
+
+    monkeypatch.setenv("RISK_PUSH_TOKEN", "ma-thu")
+    assert client.post("/api/risk/snapshot", json={"city": "hcm", "record": record}, headers={"X-Push-Token": "sai"}).status_code == 403
+    assert client.post("/api/risk/snapshot", json={"city": "hcm", "record": {}}, headers={"X-Push-Token": "ma-thu"}).status_code == 422
+    assert client.post("/api/risk/snapshot", json={"city": "hcm", "record": record}, headers={"X-Push-Token": "ma-thu"}).json() == {"ok": True}
+    body = client.get("/api/risk").json()
+    assert body["rain_missing"] is False and body["stale"] is False and body["states"]["rain"] == "alert"
+    assert body["counts_now"] == {"high": 5, "medium": 15}

@@ -97,6 +97,18 @@ class Context:
             self.last_refresh = snapshot.generated_at.isoformat(timespec="seconds")
             return snapshot, None
 
+    def accept_snapshot(self, city: str, record: dict) -> None:
+        """Nhận một bản tính của mô hình do máy khác tính (khi máy chủ này không gọi được nguồn mưa)."""
+        snapshot = ports.from_record(record)
+        if snapshot.city != city:
+            raise ValueError("Bản tính không phải của thành phố này")
+        self.model(city)  # thành phố chưa có mô hình thì báo thiếu file
+        with self._risk_lock:
+            self.snapshots[city] = (snapshot, time.monotonic())
+            self._save_risk(city, snapshot)
+            self.risk_failures.pop(city, None)
+            self.last_refresh = snapshot.generated_at.isoformat(timespec="seconds")
+
     @staticmethod
     def _risk_file(city: str):
         return config.live_dir() / f"last_risk_{city}.json"

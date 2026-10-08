@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import hmac
 import json
 
-from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi import FastAPI, Header, HTTPException, Request, Response
+from pydantic import BaseModel
 
 from floodrisk import config
 from floodrisk.api import ports, settings
@@ -24,6 +26,11 @@ def validated_cities() -> set[str]:
     except (OSError, ValueError):
         return set()
     return set(choice.get("validated") or [])
+
+
+class SnapshotIn(BaseModel):
+    city: str = "hcm"
+    record: dict  # bản tính ở dạng `to_record` của mô hình
 
 
 def _city(city: str) -> str:
@@ -143,6 +150,22 @@ def register(app: FastAPI, ctx: Context) -> None:
             "counts_now": {"high": int((level == 2).sum()), "medium": int((level == 1).sum())},
             "layer": {"url": f"/api/risk/routes?city={city}&v={_file_version(layer)}"} if layer.exists() else None,
         }
+
+    @app.post("/api/risk/snapshot")
+    def risk_snapshot(body: SnapshotIn, x_push_token: str | None = Header(default=None)):
+        """Nhận bản tính của mô hình từ một máy khác (tools/ghi_du_lieu.py), cho nơi máy chủ không gọi được Open-Meteo."""
+        token = settings.risk_push_token()
+        if not token:
+            raise HTTPException(404, "Máy chủ này không nhận bản tính từ ngoài")
+        if not hmac.compare_digest(x_push_token or "", token):
+            raise HTTPException(403, "Sai mã đẩy bản tính")
+        try:
+            ctx.accept_snapshot(_city(body.city), body.record)
+        except FileNotFoundError:
+            raise HTTPException(404, "Chưa có mô hình cho thành phố này") from None
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(422, f"Bản tính không đọc được: {exc}") from None
+        return {"ok": True}
 
     @app.get("/api/risk/routes")
     def risk_routes(request: Request, city: str = "hcm"):

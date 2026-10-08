@@ -18,5 +18,7 @@ services:
         sync: false
       - key: GEMINI_API_KEY_3
         sync: false
+      - key: RISK_PUSH_TOKEN
+        sync: false
       - key: REFRESH_MINUTES
         value: "60"

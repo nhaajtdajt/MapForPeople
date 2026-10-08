@@ -18,6 +18,11 @@ def test_tools_enabled() -> bool:
     return os.environ.get("FLOODRISK_TEST_TOOLS", "") == "1"
 
 
+def risk_push_token() -> str:
+    """Mã cho phép một máy khác đẩy bản tính của mô hình lên máy chủ này. Rỗng thì máy chủ không nhận."""
+    return os.environ.get("RISK_PUSH_TOKEN", "")
+
+
 def db_path() -> Path:
     return data_dir() / "reports.sqlite"
 
