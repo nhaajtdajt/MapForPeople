@@ -87,6 +87,8 @@ export interface RiskState {
   model_rain: DayState;
   /** Số trạm đo đang ghi nhận mưa tới mức cảnh giác; null khi thành phố không có trạm. */
   wet_gauges: number | null;
+  /** Radar: giờ của ảnh cuối và mã các tuyến radar đang thấy mưa lớn. null khi chưa có số liệu radar còn mới. */
+  radar: { at: string; image_time: string; images: number; watch: number[]; alert: number[] } | null;
   /** Mức riêng của những tuyến lệch khỏi `states`, khóa là `id` của tuyến trong lớp bản đồ. */
   overrides: Record<string, number>;
   counts_now: { high: number; medium: number };

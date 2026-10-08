@@ -4,6 +4,7 @@ import json
 import threading
 import time
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Callable
 
 import numpy as np
@@ -16,6 +17,7 @@ from floodrisk.api.goong import Goong
 from floodrisk.api.graphroute import RoadGraph
 
 RISK_RETRY_S = 120  # sau một lần tính hỏng, chờ chừng này rồi mới thử lại
+RADAR_MAX_AGE_S = 30 * 60  # trạng thái radar cũ hơn thế thì không dùng
 LOCAL_TTL_S = 300  # đọc lại trạm mưa và triều mỗi 5 phút
 
 
@@ -33,6 +35,7 @@ class Context:
     hydro_sources: dict = field(default_factory=dict)  # thành phố -> nguồn trạm mưa và triều; trống thì chỉ dùng mô hình
     locals: dict = field(default_factory=dict)  # thành phố -> (Local, lúc đọc, bản tính của mô hình đã dùng)
     edge_routes: dict = field(default_factory=dict)  # thành phố -> cạnh gắn vào tuyến nào
+    radars: dict = field(default_factory=dict)  # thành phố -> (dấu thời gian của file, trạng thái radar)
     _local_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _graph_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _risk_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
@@ -97,6 +100,37 @@ class Context:
             self.last_refresh = snapshot.generated_at.isoformat(timespec="seconds")
             return snapshot, None
 
+    @staticmethod
+    def _radar_file(city: str):
+        return config.live_dir() / f"radar_state_{city}.json"
+
+    def accept_radar(self, city: str, state: dict) -> None:
+        """Nhận trạng thái radar do máy xử lý ảnh gửi lên: giờ tính, giờ của ảnh cuối, và các tuyến ở mức cảnh giác, báo động."""
+        clean = {"at": str(state["at"]), "image_time": str(state["image_time"]), "images": int(state.get("images", 0)),
+                 "watch": [int(i) for i in state["watch"]], "alert": [int(i) for i in state["alert"]]}
+        datetime.fromisoformat(clean["at"])
+        path = self._radar_file(city)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(clean), encoding="utf-8")
+
+    def radar(self, city: str):
+        """Trạng thái radar gần nhất còn dùng được, hoặc None. Đọc từ file do bộ ghi viết (cùng máy) hoặc do máy khác gửi lên."""
+        path = self._radar_file(city)
+        try:
+            stat = path.stat()
+            held = self.radars.get(city)
+            if held is None or held[0] != stat.st_mtime_ns:
+                state = json.loads(path.read_text(encoding="utf-8"))
+                n = len(self.model(city).routes)
+                state["watch"] = np.array([i for i in state["watch"] if 0 <= i < n], np.int64)
+                state["alert"] = np.array([i for i in state["alert"] if 0 <= i < n], np.int64)
+                held = self.radars[city] = (stat.st_mtime_ns, state)
+            state = held[1]
+            age = datetime.now(timezone.utc) - datetime.fromisoformat(state["at"]).astimezone(timezone.utc)
+            return state if age.total_seconds() <= RADAR_MAX_AGE_S else None
+        except (OSError, ValueError, KeyError):
+            return None
+
     def accept_snapshot(self, city: str, record: dict) -> None:
         """Nhận một bản tính của mô hình do máy khác tính (khi máy chủ này không gọi được nguồn mưa)."""
         snapshot = ports.from_record(record)
@@ -156,6 +190,13 @@ class Context:
         model = self.model(city)
         local = self.local(city, snapshot)
         level = live_local.route_levels(model, local) if local is not None else model.levels(snapshot.hours[0])
+        radar = self.radar(city)
+        if radar is not None and local is not None:
+            # Radar là một nguồn nữa cho trạng thái mưa của từng tuyến: lấy mức lớn hơn giữa trạm đo và radar.
+            rain = local.rain_state.copy()
+            rain[radar["watch"]] = np.maximum(rain[radar["watch"]], 1)
+            rain[radar["alert"]] = 2
+            level = ports.model_route_levels(model.bands_rain, model.bands_tide, rain, local.tide_state)
         reported = live_reports.by_route(live_reports.active(settings.db_path(), city))
         level, confirmed = live_reports.apply(level, reported)
         return level, confirmed, reported

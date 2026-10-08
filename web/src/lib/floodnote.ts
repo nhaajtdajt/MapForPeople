@@ -3,13 +3,21 @@ import type { FloodNote } from "../components/PlaceCard";
 import type { MapHit } from "../MapView";
 import { clockOf, LEVEL_LABEL, routeLevel, routeReasons, STATE_LABEL } from "./risk";
 
+/** "19:40" theo giờ Việt Nam từ một mốc giờ ISO bất kỳ múi giờ. */
+export function clockInVietnam(iso: string): string {
+  const time = new Date(iso);
+  if (Number.isNaN(time.getTime())) return "";
+  return new Date(time.getTime() + 7 * 3600_000).toISOString().slice(11, 16);
+}
+
 /** Dòng trạng thái dưới ô tìm kiếm: mưa và triều của cả thành phố theo mô hình, kèm giờ tính. */
 export function riskLine(risk: RiskState | null): string {
   if (!risk) return "Chưa có mức nguy cơ";
   const now = risk.hours[0];
   const tide = risk.local?.tide ? ` (Phú An ${risk.local.tide.level_m.toFixed(2).replace(".", ",")} m)` : "";
   const forecast = risk.rain_missing ? "chưa có số liệu" : STATE_LABEL[risk.model_rain];
-  const rain = risk.wet_gauges === null ? `Mưa: ${forecast}` : `Đang mưa to quanh ${risk.wet_gauges} trạm · Dự báo cả thành phố: ${forecast}`;
+  const radar = risk.radar ? ` · radar ${clockInVietnam(risk.radar.image_time)}: ${risk.radar.watch.length + risk.radar.alert.length} tuyến` : "";
+  const rain = risk.wet_gauges === null ? `Mưa: ${forecast}` : `Đang mưa to quanh ${risk.wet_gauges} trạm${radar} · Dự báo cả thành phố: ${forecast}`;
   const text = `${rain} · Triều: ${STATE_LABEL[risk.states.tide]}${tide} · ${clockOf(now.valid_time)}`;
   return risk.stale && !risk.rain_missing ? `${text} · số liệu cũ` : text;
 }
@@ -40,7 +48,9 @@ export function floodNote(hit: MapHit | null, now: RiskHour | null, risk: RiskSt
   const lines = routeReasons(hit.route, rain, tide);
   if (own !== undefined && !reported) {
     lines.length = 0;
-    if (hit.route.br > 0) lines.push("Trạm đo mưa trong 5 km quanh tuyến này đang ghi nhận mưa lớn, và mô hình xếp tuyến này vào nhóm dễ ngập do mưa.");
+    const seen = risk?.radar && (risk.radar.watch.includes(hit.id) || risk.radar.alert.includes(hit.id));
+    const source = seen ? `Radar lúc ${clockInVietnam(risk.radar!.image_time)} thấy mưa lớn tại đây` : "Trạm đo mưa trong 5 km quanh tuyến này đang ghi nhận mưa lớn";
+    if (hit.route.br > 0) lines.push(`${source}, và mô hình xếp tuyến này vào nhóm dễ ngập do mưa.`);
     if (hit.route.hr + hit.route.ht > 0) lines.push(`Từng có ghi nhận ngập trước 2025: ${hit.route.hr + hit.route.ht} ngày.`);
   }
   return {

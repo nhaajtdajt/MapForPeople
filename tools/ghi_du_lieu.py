@@ -149,6 +149,64 @@ def push_model() -> str:
     return f"đẩy mức lên máy chủ: HTTP {r.status_code}"
 
 
+SCAN_PER_CYCLE = 3  # số camera nhờ Gemini đọc mỗi lượt: hạn mức miễn phí chỉ vài chục lần gọi một ngày
+SCAN_GAP = timedelta(minutes=30)  # không đọc lại một camera sớm hơn thế
+_scanned: dict[str, datetime] = {}
+
+
+def radar_step(now: datetime) -> str:
+    """Đổi các ảnh radar của giờ qua thành trạng thái mưa của từng tuyến, ghi ra file cho máy chủ trên máy này và gửi lên máy chủ trên mạng.
+
+    Sau đó nhờ máy chủ cho Gemini đọc vài camera nằm trong khu radar thấy mưa lớn, để xác nhận hoặc gỡ (ghi chú 11, QĐ4).
+    """
+    from floodrisk import config as fr_config
+    from floodrisk.live import radar
+
+    utc = now.astimezone(timezone.utc)
+    folders = [LIVE / f"{(now - timedelta(days=d)):%Y-%m-%d}" / "radar" for d in (0, 1)]
+    images = radar.last_hour(folders, utc)
+    if len(images) < radar.MIN_IMAGES:
+        return f"radar chỉ có {len(images)} ảnh trong giờ qua"
+    rate = radar.hourly_rate([radar.levels(p) for p in images])
+    routes = pd.read_parquet(fr_config.route_table_path("hcm"), columns=["lat", "lon", "band_rain"])
+    state = radar.states_at(routes.lat.to_numpy(), routes.lon.to_numpy(), rate)
+    state[routes.band_rain.to_numpy() == 0] = 0  # tuyến mô hình không xếp là dễ ngập do mưa thì không bao giờ có mức do mưa
+    record = {"at": utc.isoformat(timespec="seconds"), "image_time": radar.image_time(images[-1]).isoformat(timespec="seconds"),
+              "images": len(images), "watch": np.flatnonzero(state == 1).tolist(), "alert": np.flatnonzero(state == 2).tolist()}
+    (LIVE / "radar_state_hcm.json").write_text(json.dumps(record), encoding="utf-8")
+    note = f"radar {len(images)} ảnh: {len(record['watch'])} tuyến cảnh giác, {len(record['alert'])} báo động"
+
+    url, token = env_value("RISK_PUSH_URL").rstrip("/"), env_value("RISK_PUSH_TOKEN")
+    if not url or not token:
+        return note
+    r = httpx.post(url + "/api/risk/radar", json={"city": "hcm", "state": record}, headers={"X-Push-Token": token}, timeout=60)
+    note += f"; gửi radar HTTP {r.status_code}"
+
+    cams = [c for c in httpx.get(url + "/api/cameras", params={"city": "hcm"}, timeout=60).json() if c["has_image"]]
+    if not cams:
+        return note
+    wet = radar.states_at([c["lat"] for c in cams], [c["lon"] for c in cams], rate)
+    due = [(int(s), c) for s, c in zip(wet, cams) if s > 0 and now - _scanned.get(c["id"], now - SCAN_GAP) >= SCAN_GAP]
+    due.sort(key=lambda sc: -sc[0])  # khu báo động trước
+    read = []
+    for _, cam in due[:SCAN_PER_CYCLE]:
+        _scanned[cam["id"]] = now
+        try:
+            got = httpx.post(url + f"/api/cameras/{cam['id']}/read", timeout=150)
+        except httpx.HTTPError as exc:
+            read.append(f"{cam['name']}: lỗi {type(exc).__name__}")
+            continue
+        if got.status_code != 200:
+            read.append(f"{cam['name']}: HTTP {got.status_code}")
+            if got.status_code == 503:  # hết khóa hoặc hết hạn mức Gemini: thôi không gọi tiếp lượt này
+                break
+            continue
+        reading = got.json()["reading"]
+        append(LIVE / f"{now:%Y-%m-%d}" / "camera_readings.jsonl", {"at": now.isoformat(timespec="seconds"), "camera": cam, "reading": reading})
+        read.append(f"{cam['name']}: {'NGẬP ' + str(reading.get('depth_class')) if reading.get('flooded') else reading.get('depth_class')}")
+    return note + f"; camera trong khu mưa {int((wet > 0).sum())}" + (", Gemini đọc " + " | ".join(read) if read else "")
+
+
 def save_cameras(day: Path, now: datetime) -> tuple[int, int]:
     wl = json.loads((LIVE / "watchlist.json").read_text(encoding="utf-8"))["cameras"]
     folder = day / "cams" / f"{now:%H%M}"
@@ -177,6 +235,10 @@ def cycle(last_model_hour: int | None) -> int | None:
         parts.append(f"radar +{save_radar(day)}")
     except Exception as exc:
         parts.append(f"radar lỗi {type(exc).__name__}")
+    try:
+        parts.append(radar_step(now))
+    except Exception as exc:
+        parts.append(f"radar lỗi {type(exc).__name__}: {exc}")
     tide, wettest = None, 0.0
     try:
         tide, wettest = save_hydro(day, now)

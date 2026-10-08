@@ -28,6 +28,11 @@ def validated_cities() -> set[str]:
     return set(choice.get("validated") or [])
 
 
+class RadarIn(BaseModel):
+    city: str = "hcm"
+    state: dict  # như tools/ghi_du_lieu.py gửi: at, image_time, images, watch, alert
+
+
 class SnapshotIn(BaseModel):
     city: str = "hcm"
     record: dict  # bản tính ở dạng `to_record` của mô hình
@@ -58,6 +63,13 @@ def _local(model, hour, local) -> dict:
                    "high": [int(i) for i in (raised & (level == 2)).nonzero()[0]]},
         "counts": {"high": int((level == 2).sum()), "medium": int((level == 1).sum())},
     }
+
+
+def _radar(state) -> dict | None:
+    if state is None:
+        return None
+    return {"at": state["at"], "image_time": state["image_time"], "images": state["images"],
+            "watch": [int(i) for i in state["watch"]], "alert": [int(i) for i in state["alert"]]}
 
 
 def _file_version(path) -> str:
@@ -148,6 +160,8 @@ def register(app: FastAPI, ctx: Context) -> None:
             # Dự báo chung của Mô hình 2 cho cả thành phố: chỉ để thông báo, không dùng để tô màu khi đã có số đo tại chỗ.
             "model_rain": ports.STATE_NAMES[now.rain.state],
             "wet_gauges": sum(1 for g in local.gauges if g["state"] > 0) if local is not None else None,
+            # Radar: giờ của ảnh cuối và các tuyến radar đang thấy mưa lớn (mã là `id` của tuyến trong lớp bản đồ).
+            "radar": _radar(ctx.radar(city)),
             # Mức lúc này của những tuyến khác với mức suy từ `states` (do trạm mưa gần tuyến hoặc do báo cáo).
             # Khóa là `id` của tuyến trong lớp bản đồ.
             "overrides": {str(int(i)): int(level[i]) for i in changed},
@@ -170,6 +184,20 @@ def register(app: FastAPI, ctx: Context) -> None:
             raise HTTPException(404, "Chưa có mô hình cho thành phố này") from None
         except (KeyError, TypeError, ValueError) as exc:
             raise HTTPException(422, f"Bản tính không đọc được: {exc}") from None
+        return {"ok": True}
+
+    @app.post("/api/risk/radar")
+    def risk_radar(body: RadarIn, x_push_token: str | None = Header(default=None)):
+        """Nhận trạng thái radar từ máy xử lý ảnh (tools/ghi_du_lieu.py)."""
+        token = settings.risk_push_token()
+        if not token:
+            raise HTTPException(404, "Máy chủ này không nhận số liệu từ ngoài")
+        if not hmac.compare_digest(x_push_token or "", token):
+            raise HTTPException(403, "Sai mã đẩy số liệu")
+        try:
+            ctx.accept_radar(_city(body.city), body.state)
+        except (KeyError, TypeError, ValueError) as exc:
+            raise HTTPException(422, f"Trạng thái radar không đọc được: {exc}") from None
         return {"ok": True}
 
     @app.get("/api/risk/routes")
