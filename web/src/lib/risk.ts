@@ -39,9 +39,18 @@ function causeExpression(property: "br" | "bt", state: DayState): Expr | number 
   return 0;
 }
 
-/** Biểu thức MapLibre cho mức của một tuyến khi trạng thái mưa và triều đã biết. */
-export function levelExpression(rain: DayState, tide: DayState): Expr {
-  return ["max", causeExpression("br", rain), causeExpression("bt", tide)];
+/**
+ * Biểu thức MapLibre cho mức của một tuyến khi trạng thái mưa và triều đã biết.
+ * `overrides` là mức riêng của vài tuyến (do trạm mưa gần đó hoặc do báo cáo), khóa là `id` của tuyến trong lớp bản đồ.
+ */
+export function levelExpression(rain: DayState, tide: DayState, overrides: Record<string, number> = {}): Expr {
+  const base: Expr = ["max", causeExpression("br", rain), causeExpression("bt", tide)];
+  const cases: unknown[] = [];
+  for (const level of [0, 1, 2]) {
+    const ids = Object.keys(overrides).filter((id) => overrides[id] === level).map(Number);
+    if (ids.length > 0) cases.push(ids, level);
+  }
+  return cases.length > 0 ? ["match", ["id"], ...cases, base] : base;
 }
 
 /** Các dòng giải thích trên thẻ của một tuyến: mức đến từ đâu, và tuyến có từng ngập không. */

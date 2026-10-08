@@ -36,6 +36,23 @@ def _cause(cause) -> dict:
     return {"state": ports.STATE_NAMES[cause.state], "trigger": round(cause.trigger, 6), **cause.inputs}
 
 
+def _local(model, hour, local) -> dict:
+    """Số đo tại chỗ và những tuyến chúng nâng mức. Mã tuyến trong `raised` là `id` của tuyến trong lớp bản đồ."""
+    base = model.levels(hour)
+    level = ports.local_route_levels(model, local)
+    raised = level > base
+    return {
+        "at": local.at.isoformat(timespec="seconds"),
+        "errors": local.errors,
+        "tide": {**local.tide, "state": ports.STATE_NAMES[local.tide["state"]]} if local.tide else None,
+        "tide_state": ports.STATE_NAMES[local.tide_state],
+        "gauges": [{**g, "state": ports.STATE_NAMES[g["state"]]} for g in local.gauges],
+        "raised": {"medium": [int(i) for i in (raised & (level == 1)).nonzero()[0]],
+                   "high": [int(i) for i in (raised & (level == 2)).nonzero()[0]]},
+        "counts": {"high": int((level == 2).sum()), "medium": int((level == 1).sum())},
+    }
+
+
 def _file_version(path) -> str:
     stat = path.stat()
     return hashlib.sha1(f"{stat.st_size}:{stat.st_mtime_ns}".encode()).hexdigest()[:10]
@@ -99,6 +116,13 @@ def register(app: FastAPI, ctx: Context) -> None:
         if snapshot is None:
             raise HTTPException(503, error or "Chưa tính được mức nguy cơ")
         layer = config.risk_layer_path(city)
+        local = ctx.local(city, snapshot)
+        level, _, reported = ctx.route_state(city)
+        # Trạng thái đang áp cho cả thành phố: mưa theo mô hình, triều là mức lớn hơn giữa mô hình và mực nước Phú An.
+        now = snapshot.hours[0]
+        tide_state = local.tide_state if local is not None else now.tide.state
+        base = ports.model_route_levels(model.bands_rain, model.bands_tide, now.rain.state, tide_state)
+        changed = (level != base).nonzero()[0]
         return {
             "city": city,
             "model_version": snapshot.model_version,
@@ -108,6 +132,13 @@ def register(app: FastAPI, ctx: Context) -> None:
             "error": error,
             "hours": [{"valid_time": hour.valid_time.isoformat(), "rain": _cause(hour.rain), "tide": _cause(hour.tide),
                        "counts": model.counts(hour)} for hour in snapshot.hours],
+            "local": _local(model, snapshot.hours[0], local) if local is not None else None,
+            "states": {"rain": ports.STATE_NAMES[now.rain.state], "tide": ports.STATE_NAMES[tide_state]},
+            # Mức lúc này của những tuyến khác với mức suy từ `states` (do trạm mưa gần tuyến hoặc do báo cáo).
+            # Khóa là `id` của tuyến trong lớp bản đồ.
+            "overrides": {str(int(i)): int(level[i]) for i in changed},
+            "reports": [{"id": int(row), **info} for row, info in reported.items()],
+            "counts_now": {"high": int((level == 2).sum()), "medium": int((level == 1).sum())},
             "layer": {"url": f"/api/risk/routes?city={city}&v={_file_version(layer)}"} if layer.exists() else None,
         }
 

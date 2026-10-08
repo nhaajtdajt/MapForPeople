@@ -17,7 +17,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type { FeatureCollection } from "geojson";
 import { useEffect, useRef, useState } from "react";
 
-import { serverUrl, type FloodPointProps, type FloodPoints } from "./api";
+import { serverUrl, type Camera, type FloodPointProps, type FloodPoints, type FloodReport } from "./api";
 import { levelExpression, type DayState, type RouteProps } from "./lib/risk";
 
 setWorkerUrl(workerUrl);
@@ -30,6 +30,12 @@ const PIN_COLOR = "#1d4ed8";
 const RISK_SOURCE = "risk-routes";
 const POINT_SOURCE = "flood-points";
 const POINT_LAYER = "flood-points";
+const CAMERA_SOURCE = "cameras";
+const CAMERA_LAYER = "cameras";
+const REPORT_SOURCE = "reports";
+const REPORT_LAYER = "reports";
+export const CAMERA_COLOR = "#475569";
+export const REPORT_COLOR = { flooded: "#b91c1c", clear: "#15803d" } as const;
 export const LEVEL_COLOR = { 1: "#f59e0b", 2: "#dc2626" } as const;
 export const POINT_COLOR = { rain: "#2563eb", tide: "#0d9488" } as const;
 const MAJOR_CLASSES = ["motorway", "trunk", "primary", "secondary", "tertiary", "motorway_link", "trunk_link", "primary_link", "secondary_link", "tertiary_link"];
@@ -44,17 +50,31 @@ const TAP_RADIUS_PX = 7;
 const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 
 /** Thứ người dùng chạm trúng trên lớp ngập, nếu có. */
-export type MapHit = { kind: "route"; route: RouteProps } | { kind: "point"; point: FloodPointProps };
+export type MapHit =
+  | { kind: "route"; route: RouteProps; id: number }
+  | { kind: "point"; point: FloodPointProps }
+  | { kind: "camera"; camera: Camera };
 
 export interface RiskView {
   url: string; // đường dẫn lớp tuyến trên máy chủ, đổi khi mô hình được dựng lại
   rain: DayState;
   tide: DayState;
+  overrides: Record<string, number>; // mức riêng của vài tuyến, xem lib/risk.ts
 }
 
-function riskFilter(level: number, major: boolean, rain: DayState, tide: DayState): FilterSpecification {
+function riskFilter(level: number, major: boolean, risk: Pick<RiskView, "rain" | "tide" | "overrides">): FilterSpecification {
   const isMajor = ["in", ["get", "cls"], ["literal", MAJOR_CLASSES]];
-  return ["all", ["==", levelExpression(rain, tide), level], major ? isMajor : ["!", isMajor]] as unknown as FilterSpecification;
+  const levelNow = levelExpression(risk.rain, risk.tide, risk.overrides);
+  return ["all", ["==", levelNow, level], major ? isMajor : ["!", isMajor]] as unknown as FilterSpecification;
+}
+
+const QUIET: Pick<RiskView, "rain" | "tide" | "overrides"> = { rain: "quiet", tide: "quiet", overrides: {} };
+
+function pointFeatures<T extends { lat: number; lon: number }>(items: T[]): FeatureCollection {
+  return {
+    type: "FeatureCollection",
+    features: items.map((item) => ({ type: "Feature", geometry: { type: "Point", coordinates: [item.lon, item.lat] }, properties: { ...item } })),
+  };
 }
 
 function addRiskLayers(map: MapLibreMap): void {
@@ -70,7 +90,7 @@ function addRiskLayers(map: MapLibreMap): void {
         type: "line",
         source: RISK_SOURCE,
         minzoom: layer.major ? 9 : MINOR_MIN_ZOOM,
-        filter: riskFilter(layer.level, layer.major, "quiet", "quiet"),
+        filter: riskFilter(layer.level, layer.major, QUIET),
         layout: { "line-cap": "round", "line-join": "round" },
         paint: {
           "line-color": LEVEL_COLOR[layer.level],
@@ -95,6 +115,32 @@ function addRiskLayers(map: MapLibreMap): void {
       "circle-stroke-width": 1.5,
     },
   });
+  map.addSource(CAMERA_SOURCE, { type: "geojson", data: EMPTY });
+  map.addLayer({
+    id: CAMERA_LAYER,
+    type: "circle",
+    source: CAMERA_SOURCE,
+    minzoom: 12,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 12, 2.5, 15, 5, 17, 7],
+      "circle-color": CAMERA_COLOR,
+      "circle-opacity": ["case", ["get", "has_image"], 0.9, 0.3],
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 1,
+    },
+  });
+  map.addSource(REPORT_SOURCE, { type: "geojson", data: EMPTY });
+  map.addLayer({
+    id: REPORT_LAYER,
+    type: "circle",
+    source: REPORT_SOURCE,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 5, 15, 9],
+      "circle-color": ["match", ["get", "status"], "clear", REPORT_COLOR.clear, REPORT_COLOR.flooded],
+      "circle-stroke-color": "#ffffff",
+      "circle-stroke-width": 2,
+    },
+  });
 }
 
 export interface FlyTarget {
@@ -117,6 +163,9 @@ interface Props {
   showRisk: boolean;
   points: FloodPoints | null;
   showPoints: boolean;
+  cameras: Camera[];
+  showCameras: boolean;
+  reports: FloodReport[];
   onTap: (lat: number, lon: number, hit: MapHit | null) => void;
   onMoveEnd: (view: MapViewState) => void;
   onLocate: (lat: number, lon: number, accuracy: number) => void;
@@ -156,7 +205,7 @@ class DisabledLocateControl implements IControl {
   }
 }
 
-export default function MapView({ initial, pin, flyTo, risk, showRisk, points, showPoints, onTap, onMoveEnd, onLocate, onNotice }: Props) {
+export default function MapView({ initial, pin, flyTo, risk, showRisk, points, showPoints, cameras, showCameras, reports, onTap, onMoveEnd, onLocate, onNotice }: Props) {
   const [ready, setReady] = useState(false); // kiểu bản đồ nền đã nạp xong, thêm lớp được
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -200,15 +249,18 @@ export default function MapView({ initial, pin, flyTo, risk, showRisk, points, s
     });
     map.on("click", (event) => {
       const { x, y } = event.point;
-      const layers = [POINT_LAYER, ...RISK_LAYERS.map((layer) => layer.id)].filter((id) => map.getLayer(id));
+      const layers = [CAMERA_LAYER, POINT_LAYER, ...RISK_LAYERS.map((layer) => layer.id)].filter((id) => map.getLayer(id));
       const hits = layers.length > 0 ? map.queryRenderedFeatures([[x - TAP_RADIUS_PX, y - TAP_RADIUS_PX], [x + TAP_RADIUS_PX, y + TAP_RADIUS_PX]], { layers }) : [];
+      const camera = hits.find((feature) => feature.layer.id === CAMERA_LAYER);
       const point = hits.find((feature) => feature.layer.id === POINT_LAYER);
-      const route = hits.find((feature) => feature.layer.id !== POINT_LAYER);
-      const hit: MapHit | null = point
-        ? { kind: "point", point: point.properties as FloodPointProps }
-        : route
-          ? { kind: "route", route: route.properties as RouteProps }
-          : null;
+      const route = hits.find((feature) => feature.layer.id !== POINT_LAYER && feature.layer.id !== CAMERA_LAYER);
+      const hit: MapHit | null = camera
+        ? { kind: "camera", camera: camera.properties as Camera }
+        : point
+          ? { kind: "point", point: point.properties as FloodPointProps }
+          : route
+            ? { kind: "route", route: route.properties as RouteProps, id: Number(route.id) }
+            : null;
       callbacks.current.onTap(event.lngLat.lat, event.lngLat.lng, hit);
     });
     map.on("moveend", () => {
@@ -253,14 +305,29 @@ export default function MapView({ initial, pin, flyTo, risk, showRisk, points, s
 
   const rain = risk?.rain ?? "quiet";
   const tide = risk?.tide ?? "quiet";
+  const overridesKey = JSON.stringify(risk?.overrides ?? {});
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
+    const now = { rain, tide, overrides: JSON.parse(overridesKey) as Record<string, number> };
     for (const layer of RISK_LAYERS) {
-      map.setFilter(layer.id, riskFilter(layer.level, layer.major, rain, tide));
+      map.setFilter(layer.id, riskFilter(layer.level, layer.major, now));
       map.setLayoutProperty(layer.id, "visibility", showRisk ? "visible" : "none");
     }
-  }, [ready, rain, tide, showRisk]);
+  }, [ready, rain, tide, overridesKey, showRisk]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    (map.getSource(CAMERA_SOURCE) as GeoJSONSource).setData(pointFeatures(cameras));
+    map.setLayoutProperty(CAMERA_LAYER, "visibility", showCameras ? "visible" : "none");
+  }, [ready, cameras, showCameras]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    (map.getSource(REPORT_SOURCE) as GeoJSONSource).setData(pointFeatures(reports));
+  }, [ready, reports]);
 
   useEffect(() => {
     const map = mapRef.current;

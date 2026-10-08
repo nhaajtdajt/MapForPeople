@@ -4,13 +4,17 @@ from datetime import datetime, timedelta, timezone
 
 from fastapi import FastAPI, HTTPException
 
+import numpy as np
+
 from floodrisk import config
+from floodrisk.api import floodcost
 from floodrisk.api.context import Context
 from floodrisk.api.graphroute import VEHICLES, GraphError, Route, RouteParams
 
 VN = timezone(timedelta(hours=7))
 LONG_DETOUR = 1.5  # lộ trình lâu hơn đường nhanh nhất quá 1,5 lần thì cắm cờ cho giao diện
 ESTIMATE_NOTE = "Thời gian là ước lượng theo loại đường, chưa tính giao thông."
+FLOOD_NOTE = "Lộ trình đề xuất đã tính mức nguy cơ ngập lúc này; mỗi lộ trình ghi số mét đi qua đường đang có mức."
 
 
 def parse_point(text: str, label: str) -> tuple[float, float]:
@@ -26,13 +30,14 @@ def parse_point(text: str, label: str) -> tuple[float, float]:
 
 
 def register(app: FastAPI, ctx: Context) -> None:
-    def route_json(index: int, route: Route, fastest: Route, graph, now: datetime) -> dict:
+    def route_json(index: int, route: Route, fastest: Route, graph, now: datetime, recommended: int, flood) -> dict:
         return {
             "id": index,
             "kind": route.kind,
             "engine": "own",
             "estimated": True,
-            "recommended": index == 0,
+            "recommended": index == recommended,
+            "flood": floodcost.exposure(route.edges, graph.length_m, flood) if flood is not None else None,
             "long_detour": route.duration_s > LONG_DETOUR * fastest.duration_s,
             "distance_m": round(route.distance_m, 1),
             "duration_s": round(route.duration_s),
@@ -75,13 +80,32 @@ def register(app: FastAPI, ctx: Context) -> None:
         if not routes:
             raise HTTPException(404, "Không tìm được đường giữa hai điểm này")
 
+        # Tránh ngập (ghi chú 11, QĐ5): tìm thêm đường tốt nhất khi các cạnh đang có mức bị làm chậm, rồi đề xuất
+        # lộ trình có chi phí thấp nhất theo cách tính đó. Thời gian hiển thị vẫn là thời gian đi bình thường.
+        flood = ctx.flood_view(city)
+        recommended = 0
+        if flood is not None:
+            slow = floodcost.slow_factors(flood)
+            base = graph.time_s(vehicle)
+            dry = graph.find_routes(snapped["origin"]["node"], snapped["destination"]["node"], vehicle,
+                                    RouteParams(max_routes=1, use_via=False, use_penalty=False), slow=slow)
+            if dry and not any(np.array_equal(dry[0].edges, r.edges) for r in routes):
+                avoid = dry[0]
+                avoid.edge_time = base[avoid.edges]
+                avoid.duration_s = float(avoid.edge_time.sum())
+                routes.append(avoid)
+                routes.sort(key=lambda r: r.duration_s)
+                for r in routes[1:]:
+                    r.kind = "flood_avoid" if r is avoid else "alternative"
+            recommended = int(np.argmin([float((base[r.edges] * slow[r.edges]).sum()) for r in routes]))
+
         now = datetime.now(VN)
-        notes = [ESTIMATE_NOTE]
+        notes = [ESTIMATE_NOTE] + ([FLOOD_NOTE] if flood is not None else [])
         for label, key in (("Điểm đi", "origin"), ("Điểm đến", "destination")):
             if snapped[key]["distance_m"] > 50:
                 notes.append(f"{label} được gắn vào đường gần nhất, cách {snapped[key]['distance_m']:.0f} m.")
         return {
-            "routes": [route_json(i, r, routes[0], graph, now) for i, r in enumerate(routes)],
+            "routes": [route_json(i, r, routes[0], graph, now, recommended, flood) for i, r in enumerate(routes)],
             "snapped": {k: {f: v for f, v in s.items() if f != "node"} for k, s in snapped.items()},
             "traffic": {"source": "none", "observed_at": None},
             "advice": None,

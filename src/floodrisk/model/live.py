@@ -47,6 +47,24 @@ def current_hour() -> pd.Timestamp:
     return pd.Timestamp.now(tz=trigger.TZ).floor("h")
 
 
+def to_record(snapshot: Snapshot) -> dict:
+    """Một bản tính ở dạng lưu được ra file JSON."""
+    def cause(c: Cause) -> dict:
+        return {"state": c.state, "trigger": c.trigger, "inputs": c.inputs}
+
+    return {"city": snapshot.city, "model_version": snapshot.model_version, "generated_at": snapshot.generated_at.isoformat(),
+            "rain_source": snapshot.rain_source,
+            "hours": [{"valid_time": h.valid_time.isoformat(), "rain": cause(h.rain), "tide": cause(h.tide)} for h in snapshot.hours]}
+
+
+def from_record(record: dict) -> Snapshot:
+    def cause(c: dict) -> Cause:
+        return Cause(int(c["state"]), float(c["trigger"]), dict(c["inputs"]))
+
+    hours = tuple(Hour(pd.Timestamp(h["valid_time"]), cause(h["rain"]), cause(h["tide"])) for h in record["hours"])
+    return Snapshot(record["city"], record["model_version"], pd.Timestamp(record["generated_at"]), record["rain_source"], hours)
+
+
 def _read_json(path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 

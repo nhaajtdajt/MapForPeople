@@ -78,7 +78,60 @@ export interface RiskState {
   stale: boolean;
   error: string | null;
   hours: RiskHour[];
+  /** Trạng thái đang áp cho cả thành phố: triều đã xét mực nước Phú An. */
+  states: { rain: DayState; tide: DayState };
+  /** Mức riêng của những tuyến lệch khỏi `states`, khóa là `id` của tuyến trong lớp bản đồ. */
+  overrides: Record<string, number>;
+  counts_now: { high: number; medium: number };
+  /** Tuyến đang có báo cáo: `shown` là mức được báo nhiều nhất (none là "không ngập"). */
+  reports: { id: number; shown: "none" | "light" | "unknown" | "moderate" | "high"; count: number; last_at: string; sources: string[] }[];
+  local: {
+    tide: { station: string; level_m: number; kind: "measured" | "model"; state: DayState } | null;
+    gauges: { name: string; lat: number; lon: number; last_1h_mm: number; max_3h_mm: number; total_24h_mm: number; state: DayState }[];
+    errors: string[];
+  } | null;
   layer: { url: string } | null;
+}
+
+export interface Camera {
+  id: string;
+  name: string;
+  lat: number;
+  lon: number;
+  has_image: boolean;
+}
+
+export interface CameraReading {
+  state: "ok" | "unusable" | "offline";
+  at?: string;
+  flooded?: boolean;
+  depth_class?: string;
+  traffic?: string;
+  evidence?: string;
+  confidence?: number;
+  model?: string;
+}
+
+export interface FloodReport {
+  id: number;
+  route: number;
+  lat: number;
+  lon: number;
+  status: "flooded" | "clear";
+  depth: "light" | "medium" | "high" | null;
+  depth_label: string | null;
+  source: "user" | "camera";
+  note: string | null;
+  at: string;
+}
+
+export interface ReportBody {
+  city: CityKey;
+  lat: number;
+  lon: number;
+  status: "flooded" | "clear";
+  depth: "light" | "medium" | "high" | null;
+  user: string;
 }
 
 export interface FloodPointProps {
@@ -119,6 +172,30 @@ async function getJson<T>(path: string, params: Params = {}, signal?: AbortSigna
   return (await response.json()) as T;
 }
 
+async function postJson<T>(path: string, body?: unknown): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetch(`${BASE}${path}`, {
+      method: "POST",
+      headers: body === undefined ? undefined : { "Content-Type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+  } catch {
+    throw new ApiError(0, "Không kết nối được tới máy chủ");
+  }
+  if (!response.ok) {
+    let detail = `Lỗi ${response.status}`;
+    try {
+      const data = (await response.json()) as { detail?: unknown };
+      if (typeof data.detail === "string") detail = data.detail;
+    } catch {
+      // phản hồi không phải JSON: giữ lời mặc định
+    }
+    throw new ApiError(response.status, detail);
+  }
+  return (await response.json()) as T;
+}
+
 export const api = {
   health: (signal?: AbortSignal) => getJson<Health>("/api/health", {}, signal),
   cities: (signal?: AbortSignal) => getJson<City[]>("/api/cities", {}, signal),
@@ -130,6 +207,10 @@ export const api = {
     getJson<ReverseResult>("/api/places/reverse", { lat, lon }, signal),
   risk: (city: CityKey, signal?: AbortSignal) => getJson<RiskState>("/api/risk", { city }, signal),
   floodPoints: (city: CityKey, signal?: AbortSignal) => getJson<FloodPoints>("/api/risk/points", { city }, signal),
+  cameras: (city: CityKey, signal?: AbortSignal) => getJson<Camera[]>("/api/cameras", { city }, signal),
+  readCamera: (id: string) => postJson<{ reading: CameraReading }>(`/api/cameras/${id}/read`),
+  reports: (city: CityKey, signal?: AbortSignal) => getJson<FloodReport[]>("/api/reports", { city }, signal),
+  sendReport: (body: ReportBody) => postJson<{ route: { id: number; name: string } }>("/api/reports", body),
 };
 
 /** Đường dẫn đầy đủ tới một tài nguyên của máy chủ, cho những chỗ MapLibre tự tải (lớp tuyến). */

@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+import json
 import threading
 import time
 from dataclasses import dataclass, field
 from typing import Callable
 
+import numpy as np
+
 from floodrisk import config
-from floodrisk.api import ports, settings
+from floodrisk.api import floodcost, ports, settings
+from floodrisk.live import local as live_local
+from floodrisk.live import reports as live_reports
 from floodrisk.api.goong import Goong
 from floodrisk.api.graphroute import RoadGraph
 
 RISK_RETRY_S = 120  # sau một lần tính hỏng, chờ chừng này rồi mới thử lại
+LOCAL_TTL_S = 600  # trạm mưa báo từng giờ, cổng số liệu chậm: đọc lại mỗi 10 phút là đủ
 
 
 @dataclass
@@ -24,6 +30,10 @@ class Context:
     models: dict = field(default_factory=dict)
     snapshots: dict = field(default_factory=dict)  # thành phố -> (Snapshot, lúc tính theo time.monotonic)
     risk_failures: dict = field(default_factory=dict)  # thành phố -> (lời báo lỗi, lúc hỏng)
+    hydro_sources: dict = field(default_factory=dict)  # thành phố -> nguồn trạm mưa và triều; trống thì chỉ dùng mô hình
+    locals: dict = field(default_factory=dict)  # thành phố -> (Local, lúc đọc, giờ của bản mô hình đã dùng)
+    edge_routes: dict = field(default_factory=dict)  # thành phố -> cạnh gắn vào tuyến nào
+    _local_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _graph_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
     _risk_lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
@@ -57,6 +67,11 @@ class Context:
         with self._risk_lock:
             model = self.model(city)
             held = self.snapshots.get(city)
+            if held is None:
+                # Vừa khởi động: lấy bản tính gần nhất đã lưu, để nguồn mưa có lỗi thì bản đồ vẫn có mức (ghi là số liệu cũ).
+                saved = self._saved_risk(city)
+                if saved is not None:
+                    held = self.snapshots[city] = (saved, float("-inf"))
             failure = self.risk_failures.get(city)
             now = time.monotonic()
             max_age_s = max(settings.refresh_minutes(), 10) * 60
@@ -71,6 +86,95 @@ class Context:
                 self.last_error = message
                 return (held[0] if held else None), message
             self.snapshots[city] = (snapshot, now)
+            self._save_risk(city, snapshot)
             self.risk_failures.pop(city, None)
             self.last_refresh = snapshot.generated_at.isoformat(timespec="seconds")
             return snapshot, None
+
+    @staticmethod
+    def _risk_file(city: str):
+        return config.live_dir() / f"last_risk_{city}.json"
+
+    def _save_risk(self, city: str, snapshot) -> None:
+        try:
+            path = self._risk_file(city)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(ports.to_record(snapshot), ensure_ascii=False), encoding="utf-8")
+        except OSError:
+            pass  # không lưu được thì lần khởi động sau tính lại từ đầu
+
+    def _saved_risk(self, city: str):
+        try:
+            return ports.from_record(json.loads(self._risk_file(city).read_text(encoding="utf-8")))
+        except (OSError, ValueError, KeyError):
+            return None
+
+    def local(self, city: str, snapshot):
+        """Số đo tại chỗ (trạm mưa, mực nước Phú An) đã áp lên giờ đầu của `snapshot`, hoặc None nếu thành phố không có nguồn."""
+        source = self.hydro_sources.get(city)
+        if source is None or snapshot is None:
+            return None
+        with self._local_lock:
+            held = self.locals.get(city)
+            hour = snapshot.hours[0]
+            if held is not None and time.monotonic() - held[1] < LOCAL_TTL_S and held[2] == hour.valid_time:
+                return held[0]
+            local = live_local.read(self.model(city), hour, source)
+            self.locals[city] = (local, time.monotonic(), hour.valid_time)
+            return local
+
+    def route_state(self, city: str):
+        """Mức của từng tuyến lúc này sau số đo tại chỗ và báo cáo: (mức, tuyến đang được xác nhận ngập, báo cáo theo tuyến).
+
+        None khi thành phố chưa có mô hình hoặc chưa tính được lần nào.
+        """
+        try:
+            snapshot, _ = self.risk(city)
+        except FileNotFoundError:
+            return None
+        if snapshot is None:
+            return None
+        model = self.model(city)
+        local = self.local(city, snapshot)
+        level = live_local.route_levels(model, local) if local is not None else model.levels(snapshot.hours[0])
+        reported = live_reports.by_route(live_reports.active(settings.db_path(), city))
+        level, confirmed = live_reports.apply(level, reported)
+        return level, confirmed, reported
+
+    def edge_route(self, city: str):
+        """Với mỗi cạnh của mạng đường: dòng của tuyến chứa nó trong bảng tuyến. None nếu thành phố chưa có bảng gắn."""
+        if city not in self.edge_routes:
+            self.edge_routes[city] = floodcost.edge_route_rows(city, self.model(city).routes.route_id.to_numpy())
+        return self.edge_routes[city]
+
+    def route_at(self, city: str, lat: float, lon: float, max_m: float = 80.0):
+        """Tuyến của mô hình tại một điểm: (dòng trong bảng tuyến, mã tuyến, tên). None nếu không có đường nào gần đó."""
+        edge_route = self.edge_route(city)
+        if edge_route is None:
+            return None
+        graph = self.graph(city)
+        node, distance = graph.snap(lon, lat, "bike")
+        if distance > max_m:
+            return None
+        rows = edge_route[np.flatnonzero((graph.u == node) | (graph.v == node))]
+        rows = rows[rows >= 0]
+        if not len(rows):
+            return None
+        routes = self.model(city).routes
+        named = [r for r in rows if isinstance(routes["name"].iloc[int(r)], str)]
+        row = int(named[0] if named else rows[0])
+        name = routes["name"].iloc[row]
+        return row, str(routes.route_id.iloc[row]), name if isinstance(name, str) else ""
+
+    def flood_view(self, city: str):
+        """Mức ngập trên từng cạnh của mạng đường, cho tìm đường tránh ngập. None khi thành phố chưa có đủ dữ liệu."""
+        state = self.route_state(city)
+        if state is None:
+            return None
+        edge_route = self.edge_route(city)
+        if edge_route is None:
+            return None
+        level, confirmed, _ = state
+        routes = self.model(city).routes
+        history = (routes.history_rain | routes.history_tide).to_numpy(bool)
+        return floodcost.FloodView(edge_route, np.asarray(level), history, routes["name"].fillna("").to_numpy(object), confirmed)

@@ -1,14 +1,16 @@
 import type { City, CityKey } from "../api";
-import { LEVEL_COLOR, POINT_COLOR } from "../MapView";
+import { CAMERA_COLOR, LEVEL_COLOR, POINT_COLOR, REPORT_COLOR } from "../MapView";
 
 interface Props {
   cities: City[];
   current: CityKey;
   showRisk: boolean;
   showPoints: boolean;
+  showCameras: boolean;
   onCity: (key: CityKey) => void;
   onShowRisk: (value: boolean) => void;
   onShowPoints: (value: boolean) => void;
+  onShowCameras: (value: boolean) => void;
   onClose: () => void;
 }
 
@@ -21,7 +23,7 @@ function Dot({ color }: { color: string }) {
 }
 
 /** Bảng "Lớp": bật tắt lớp ngập kèm chú giải, và chọn thành phố. Lớp giao thông và kiểu nền được thêm cùng spec 09. */
-export default function LayersPanel({ cities, current, showRisk, showPoints, onCity, onShowRisk, onShowPoints, onClose }: Props) {
+export default function LayersPanel({ cities, current, showRisk, showPoints, showCameras, onCity, onShowRisk, onShowPoints, onShowCameras, onClose }: Props) {
   return (
     <section
       aria-label="Lớp bản đồ"
@@ -35,7 +37,7 @@ export default function LayersPanel({ cities, current, showRisk, showPoints, onC
       </div>
       <label className="flex min-h-11 items-center gap-3 text-base text-slate-900">
         <input type="checkbox" className="h-5 w-5" checked={showRisk} onChange={(event) => onShowRisk(event.target.checked)} />
-        Nguy cơ ngập theo mô hình
+        Nguy cơ ngập
       </label>
       <ul className="mb-1 ml-8 space-y-1 text-sm text-slate-700">
         <li className="flex items-center gap-2">
@@ -45,6 +47,12 @@ export default function LayersPanel({ cities, current, showRisk, showPoints, onC
           <Line color={LEVEL_COLOR[1]} /> Mức vừa
         </li>
         <li>Nét đậm: tuyến từng có ghi nhận ngập. Nét nhạt: chỉ do mô hình xếp hạng.</li>
+        <li className="flex items-center gap-2">
+          <Dot color={REPORT_COLOR.flooded} /> Có người hoặc camera báo ngập
+        </li>
+        <li className="flex items-center gap-2">
+          <Dot color={REPORT_COLOR.clear} /> Có báo không ngập
+        </li>
       </ul>
       <label className="flex min-h-11 items-center gap-3 text-base text-slate-900">
         <input type="checkbox" className="h-5 w-5" checked={showPoints} onChange={(event) => onShowPoints(event.target.checked)} />
@@ -56,6 +64,16 @@ export default function LayersPanel({ cities, current, showRisk, showPoints, onC
         </li>
         <li className="flex items-center gap-2">
           <Dot color={POINT_COLOR.tide} /> Ngập do triều
+        </li>
+      </ul>
+
+      <label className="flex min-h-11 items-center gap-3 text-base text-slate-900">
+        <input type="checkbox" className="h-5 w-5" checked={showCameras} onChange={(event) => onShowCameras(event.target.checked)} />
+        Camera giao thông
+      </label>
+      <ul className="mb-2 ml-8 space-y-1 text-sm text-slate-700">
+        <li className="flex items-center gap-2">
+          <Dot color={CAMERA_COLOR} /> Phóng gần để thấy; chạm để xem ảnh
         </li>
       </ul>
 

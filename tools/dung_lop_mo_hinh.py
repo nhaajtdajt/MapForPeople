@@ -10,7 +10,7 @@ Cần repo flood_prediction_models nằm cạnh repo này.
    máy dựng, nên luôn lấy mã từ bảng điểm. Bảng tuyến mặc định là
    data/raw/model_build/<tên thành phố>_routes_linux.parquet (kết quả build_routes.py của repo mô hình, chạy trên Linux).
 3. Xếp nhóm tuyến như run_hourly.py rồi ghi vào data/processed/<thành phố>/:
-   - route_table.parquet     mọi tuyến: mã, tên, loại đường, chiều dài, nhóm theo mưa và triều, lịch sử ngập;
+   - route_table.parquet     mọi tuyến: mã, tên, loại đường, chiều dài, nhóm theo mưa và triều, lịch sử ngập, một điểm trên tuyến;
    - risk_routes.geojson.gz  hình học các tuyến thuộc nhóm A hoặc B, cho lớp bản đồ;
    - tide_hourly.parquet     mực triều thiên văn Vũng Tàu từng giờ (chỉ thành phố có mô hình triều).
 
@@ -101,6 +101,9 @@ def build(city: str, routes_file: Path) -> None:
         "history_dates_rain": scores.n_distinct_dates_rain.to_numpy().astype("int32"),
         "history_dates_tide": scores.n_distinct_dates_tide.to_numpy().astype("int32"),
     })
+    anchor = routes.geometry.representative_point()  # một điểm nằm trên tuyến, để xét tuyến gần trạm mưa nào
+    table["lon"] = anchor.x.to_numpy().round(6)
+    table["lat"] = anchor.y.to_numpy().round(6)
     out = config.processed_dir(city)
     out.mkdir(parents=True, exist_ok=True)
     table.to_parquet(config.route_table_path(city), index=False, compression="zstd")

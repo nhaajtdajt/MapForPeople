@@ -15,8 +15,10 @@ import importlib
 import logging
 
 from floodrisk.api import fakes
-from floodrisk.model.live import CityModel, Snapshot, current_hour  # noqa: F401  (xuất lại cho phần web)
+from floodrisk.model.live import CityModel, Snapshot, current_hour, from_record, to_record  # noqa: F401  (xuất lại cho phần web)
 from floodrisk.model.levels import LEVEL_NAMES, STATE_NAMES  # noqa: F401
+from floodrisk.model.levels import route_levels as model_route_levels  # noqa: F401
+from floodrisk.live.local import route_levels as local_route_levels  # noqa: F401
 
 log = logging.getLogger(__name__)
 

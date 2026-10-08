@@ -47,16 +47,19 @@ def day_state(trigger: float, t_watch: float, t_alert: float) -> int:
     return WATCH if trigger < t_alert else ALERT
 
 
-def cause_levels(bands: np.ndarray, state: int) -> np.ndarray:
-    """Mức do một nguyên nhân: báo động thì nhóm A lên cao và nhóm B lên vừa; cảnh giác thì chỉ nhóm A lên vừa."""
+def cause_levels(bands: np.ndarray, state) -> np.ndarray:
+    """Mức do một nguyên nhân: báo động thì nhóm A lên cao và nhóm B lên vừa; cảnh giác thì chỉ nhóm A lên vừa.
+
+    `state` là một trạng thái chung cho cả thành phố, hoặc một mảng trạng thái riêng của từng tuyến
+    (khi trạm mưa gần tuyến nâng trạng thái lên, ghi chú 11, QĐ4).
+    """
     bands = np.asarray(bands)
-    if state == ALERT:
-        return np.where(bands == 2, HIGH, np.where(bands == 1, MEDIUM, LOW)).astype(np.uint8)
-    if state == WATCH:
-        return np.where(bands == 2, MEDIUM, LOW).astype(np.uint8)
-    return np.zeros(len(bands), np.uint8)
+    state = np.broadcast_to(np.asarray(state), bands.shape)
+    on_alert = np.where(bands == 2, HIGH, np.where(bands == 1, MEDIUM, LOW))
+    on_watch = np.where(bands == 2, MEDIUM, LOW)
+    return np.where(state == ALERT, on_alert, np.where(state == WATCH, on_watch, LOW)).astype(np.uint8)
 
 
-def route_levels(bands_rain, bands_tide, state_rain: int, state_tide: int) -> np.ndarray:
+def route_levels(bands_rain, bands_tide, state_rain, state_tide) -> np.ndarray:
     """Mức của từng tuyến (0 thấp, 1 vừa, 2 cao): lấy mức lớn hơn giữa mưa và triều."""
     return np.maximum(cause_levels(bands_rain, state_rain), cause_levels(bands_tide, state_tide))
