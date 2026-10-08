@@ -16,7 +16,7 @@ from floodrisk.api.goong import Goong
 from floodrisk.api.graphroute import RoadGraph
 
 RISK_RETRY_S = 120  # sau một lần tính hỏng, chờ chừng này rồi mới thử lại
-LOCAL_TTL_S = 600  # trạm mưa báo từng giờ, cổng số liệu chậm: đọc lại mỗi 10 phút là đủ
+LOCAL_TTL_S = 300  # đọc lại trạm mưa và triều mỗi 5 phút
 
 
 @dataclass

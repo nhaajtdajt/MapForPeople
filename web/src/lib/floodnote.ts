@@ -8,8 +8,9 @@ export function riskLine(risk: RiskState | null): string {
   if (!risk) return "Chưa có mức nguy cơ";
   const now = risk.hours[0];
   const tide = risk.local?.tide ? ` (Phú An ${risk.local.tide.level_m.toFixed(2).replace(".", ",")} m)` : "";
-  const rain = risk.rain_missing ? "chưa có số liệu" : STATE_LABEL[risk.states.rain];
-  const text = `Mưa: ${rain} · Triều: ${STATE_LABEL[risk.states.tide]}${tide} · ${clockOf(now.valid_time)}`;
+  const forecast = risk.rain_missing ? "chưa có số liệu" : STATE_LABEL[risk.model_rain];
+  const rain = risk.wet_gauges === null ? `Mưa: ${forecast}` : `Đang mưa to quanh ${risk.wet_gauges} trạm · Dự báo cả thành phố: ${forecast}`;
+  const text = `${rain} · Triều: ${STATE_LABEL[risk.states.tide]}${tide} · ${clockOf(now.valid_time)}`;
   return risk.stale && !risk.rain_missing ? `${text} · số liệu cũ` : text;
 }
 
@@ -37,7 +38,11 @@ export function floodNote(hit: MapHit | null, now: RiskHour | null, risk: RiskSt
     return { tone: "high", title: `${name}: đang có báo ngập`, lines: [`${reported.count} báo cáo từ ${who} trong 90 phút qua.`, ...routeReasons(hit.route, rain, tide)] };
   }
   const lines = routeReasons(hit.route, rain, tide);
-  if (own !== undefined && lines.length === 0) lines.push("Trạm đo mưa gần tuyến này đang ghi nhận mưa lớn.");
+  if (own !== undefined && !reported) {
+    lines.length = 0;
+    if (hit.route.br > 0) lines.push("Trạm đo mưa trong 5 km quanh tuyến này đang ghi nhận mưa lớn, và mô hình xếp tuyến này vào nhóm dễ ngập do mưa.");
+    if (hit.route.hr + hit.route.ht > 0) lines.push(`Từng có ghi nhận ngập trước 2025: ${hit.route.hr + hit.route.ht} ngày.`);
+  }
   return {
     tone: level === 2 ? "high" : "medium",
     title: `${name}: nguy cơ ngập mức ${LEVEL_LABEL[level]}`,

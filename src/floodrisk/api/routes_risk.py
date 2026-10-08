@@ -125,10 +125,12 @@ def register(app: FastAPI, ctx: Context) -> None:
         layer = config.risk_layer_path(city)
         local = ctx.local(city, snapshot)
         level, _, reported = ctx.route_state(city)
-        # Trạng thái đang áp cho cả thành phố: mưa theo mô hình, triều là mức lớn hơn giữa mô hình và mực nước Phú An.
+        # Trạng thái đang áp cho cả thành phố khi vẽ. Có số đo tại chỗ thì mưa là "yên" (tuyến nào gần trạm đang mưa sẽ có
+        # mức riêng trong `overrides`) và triều là mức lớn hơn giữa mô hình và mực nước Phú An. Không có thì theo mô hình.
         now = snapshot.hours[0]
         tide_state = local.tide_state if local is not None else now.tide.state
-        base = ports.model_route_levels(model.bands_rain, model.bands_tide, now.rain.state, tide_state)
+        rain_state = 0 if local is not None and not local.errors else now.rain.state
+        base = ports.model_route_levels(model.bands_rain, model.bands_tide, rain_state, tide_state)
         changed = (level != base).nonzero()[0]
         return {
             "city": city,
@@ -142,7 +144,10 @@ def register(app: FastAPI, ctx: Context) -> None:
             "hours": [{"valid_time": hour.valid_time.isoformat(), "rain": _cause(hour.rain), "tide": _cause(hour.tide),
                        "counts": model.counts(hour)} for hour in snapshot.hours],
             "local": _local(model, snapshot.hours[0], local) if local is not None else None,
-            "states": {"rain": ports.STATE_NAMES[now.rain.state], "tide": ports.STATE_NAMES[tide_state]},
+            "states": {"rain": ports.STATE_NAMES[rain_state], "tide": ports.STATE_NAMES[tide_state]},
+            # Dự báo chung của Mô hình 2 cho cả thành phố: chỉ để thông báo, không dùng để tô màu khi đã có số đo tại chỗ.
+            "model_rain": ports.STATE_NAMES[now.rain.state],
+            "wet_gauges": sum(1 for g in local.gauges if g["state"] > 0) if local is not None else None,
             # Mức lúc này của những tuyến khác với mức suy từ `states` (do trạm mưa gần tuyến hoặc do báo cáo).
             # Khóa là `id` của tuyến trong lớp bản đồ.
             "overrides": {str(int(i)): int(level[i]) for i in changed},

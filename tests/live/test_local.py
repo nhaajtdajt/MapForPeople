@@ -51,9 +51,10 @@ def test_heavy_rain_at_a_gauge_raises_only_routes_within_five_km():
     assert list(local.route_levels(_model(), found)) == [2, 2, 0]
 
 
-def test_dry_gauge_never_lowers_the_city_state():
-    found = local.read(_model(), _hour(rain=levels.WATCH), _source(0.0, 0.9), NOW)
-    assert list(found.rain_state) == [1, 1, 1]
+def test_routes_follow_the_gauges_not_the_citywide_forecast():
+    # Mô hình báo động cả thành phố nhưng trạm gần tuyến không mưa: tuyến không có trạng thái mưa (quyết định ngày 08/10).
+    found = local.read(_model(), _hour(rain=levels.ALERT), _source(0.0, 0.9), NOW)
+    assert list(found.rain_state) == [0, 0, 0] and list(local.route_levels(_model(), found)) == [0, 0, 0]
 
 
 def test_phu_an_level_raises_the_tide_state_at_alarm_levels():

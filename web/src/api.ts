@@ -83,6 +83,10 @@ export interface RiskState {
   hours: RiskHour[];
   /** Trạng thái đang áp cho cả thành phố: triều đã xét mực nước Phú An. */
   states: { rain: DayState; tide: DayState };
+  /** Dự báo mưa chung của mô hình cho cả thành phố; chỉ để thông báo. */
+  model_rain: DayState;
+  /** Số trạm đo đang ghi nhận mưa tới mức cảnh giác; null khi thành phố không có trạm. */
+  wet_gauges: number | null;
   /** Mức riêng của những tuyến lệch khỏi `states`, khóa là `id` của tuyến trong lớp bản đồ. */
   overrides: Record<string, number>;
   counts_now: { high: number; medium: number };

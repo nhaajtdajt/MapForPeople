@@ -98,7 +98,7 @@ def _series(station: str, source: str, days: int) -> list[tuple[datetime, float]
 # ---- tide -----------------------------------------------------------------------
 
 def tide_readings() -> list[tuple[datetime, float]]:
-    return _cached("tide_obs", 900, lambda: _series(TIDE_STATION, "Water", 7) or None) or []
+    return _cached("tide_obs", 300, lambda: _series(TIDE_STATION, "Water", 7) or None) or []
 
 
 def _marine() -> list[tuple[datetime, float]]:
@@ -205,4 +205,4 @@ def rain_gauges() -> list[dict]:
 
 def gauge_hours(g: dict) -> list[tuple[datetime, float]]:
     """Rain per hour at a gauge; each value is the total of the hour ending at its time."""
-    return _cached(f"rain:{g['id']}", 600, lambda: _series(g["id"], g["source"], 1) or None) or []
+    return _cached(f"rain:{g['id']}", 300, lambda: _series(g["id"], g["source"], 1) or None) or []

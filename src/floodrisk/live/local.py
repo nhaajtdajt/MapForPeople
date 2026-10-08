@@ -1,9 +1,11 @@
-"""Số đo tại chỗ nâng mức của mô hình: trạm mưa quanh tuyến và mực nước Phú An (ghi chú 11, QĐ4).
+"""Số đo tại chỗ quyết định tuyến nào có mức: trạm mưa quanh tuyến và mực nước Phú An.
 
-Mô hình 2 chỉ cho một trạng thái mưa chung cả thành phố. Ở đây mỗi trạm đo mưa được đưa qua đúng hàm mức mưa
-của mô hình; tuyến nằm trong RADIUS_M quanh trạm nhận trạng thái lớn hơn giữa trạm và cả thành phố. Mực nước
-Phú An từ báo động 1 nâng trạng thái triều lên cảnh giác, từ báo động 2 lên báo động. Các nguồn này chỉ nâng,
-không bao giờ hạ. Ba con số RADIUS_M, TIDE_WATCH_M, TIDE_ALERT_M là do người làm web đặt, chưa hiệu chỉnh.
+Mô hình 2 chỉ cho một trạng thái mưa chung cả thành phố, tính từ dự báo thời tiết; ngày 08/10/2026 nó báo động trong khi
+mưa to chỉ rơi ở ngoại thành, và bản đồ đỏ gần hết nội thành. Vì vậy trạng thái mưa của từng tuyến lấy từ trạm đo:
+mỗi trạm được đưa qua đúng hàm mức mưa của mô hình, và tuyến nằm trong RADIUS_M quanh trạm nhận trạng thái của trạm.
+Tuyến không gần trạm nào đang mưa thì trạng thái mưa là yên, dù mô hình báo gì cho cả thành phố (quyết định của chủ dự án
+ngày 08/10, thay cho quy tắc "chỉ nâng" ở ghi chú 11, QĐ4). Mực nước Phú An từ báo động 1 nâng trạng thái triều lên
+cảnh giác, từ báo động 2 lên báo động. Ba con số RADIUS_M, TIDE_WATCH_M, TIDE_ALERT_M do người làm web đặt, chưa hiệu chỉnh.
 """
 from __future__ import annotations
 
@@ -61,7 +63,7 @@ def read(model, hour, source, now: datetime | None = None) -> Local:
     """Đọc trạm mưa và triều từ `source` (module hydro hoặc bản giả cùng ba hàm) rồi nâng trạng thái của `hour`."""
     now = now or datetime.now(VN)
     errors: list[str] = []
-    rain_state = np.full(len(model.routes), hour.rain.state, np.uint8)
+    rain_state = np.zeros(len(model.routes), np.uint8)  # yên, cho tới khi một trạm gần tuyến nói khác
     gauges: list[dict] = []
     try:
         lat, lon = model.routes.lat.to_numpy(float), model.routes.lon.to_numpy(float)
@@ -73,10 +75,10 @@ def read(model, hour, source, now: datetime | None = None) -> Local:
             t_rain = trigger.rain_trigger(inputs["max_3h_mm"], inputs["total_24h_mm"], model.rain_cfg, reference)
             state = levels.day_state(t_rain, *model.rain_limits)
             gauges.append({"name": g["name"], "lat": g["lat"], "lon": g["lon"], **inputs, "state": state})
-            if state > hour.rain.state:
+            if state > levels.QUIET:
                 near = _distance_m(lat, lon, g["lat"], g["lon"]) <= RADIUS_M
                 rain_state[near] = np.maximum(rain_state[near], state)
-    except Exception as exc:  # cổng số liệu lỗi: giữ mức của mô hình, báo lại
+    except Exception as exc:  # cổng số liệu lỗi: không còn số đo, tạm dùng trạng thái chung của mô hình và báo lại
         errors.append(f"Chưa đọc được trạm mưa: {type(exc).__name__}: {exc}")
         rain_state = np.full(len(model.routes), hour.rain.state, np.uint8)
         gauges = []
