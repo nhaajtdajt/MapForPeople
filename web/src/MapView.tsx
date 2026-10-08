@@ -17,7 +17,9 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type { FeatureCollection } from "geojson";
 import { useEffect, useRef, useState } from "react";
 
-import { serverUrl, type FloodPointProps, type FloodPoints } from "./api";
+import { serverUrl, type FloodPointProps, type FloodPoints, type RouteOption } from "./api";
+import { addRouteLayers, selectRouteAtPoint, updateRouteLayers } from "./lib/routeLayer";
+import type { DirectionEndpoint } from "./lib/useDirections";
 import { levelExpression, type DayState, type RouteProps } from "./lib/risk";
 
 setWorkerUrl(workerUrl);
@@ -117,6 +119,13 @@ interface Props {
   showRisk: boolean;
   points: FloodPoints | null;
   showPoints: boolean;
+  routes: RouteOption[];
+  selectedRouteId: number | null;
+  routeRevision: number;
+  directionOrigin: DirectionEndpoint | null;
+  directionDestination: DirectionEndpoint | null;
+  directionsOpen: boolean;
+  onRouteSelect: (routeId: number) => void;
   onTap: (lat: number, lon: number, hit: MapHit | null) => void;
   onMoveEnd: (view: MapViewState) => void;
   onLocate: (lat: number, lon: number, accuracy: number) => void;
@@ -156,14 +165,14 @@ class DisabledLocateControl implements IControl {
   }
 }
 
-export default function MapView({ initial, pin, flyTo, risk, showRisk, points, showPoints, onTap, onMoveEnd, onLocate, onNotice }: Props) {
+export default function MapView({ initial, pin, flyTo, risk, showRisk, points, showPoints, routes, selectedRouteId, routeRevision, directionOrigin, directionDestination, directionsOpen, onRouteSelect, onTap, onMoveEnd, onLocate, onNotice }: Props) {
   const [ready, setReady] = useState(false); // kiểu bản đồ nền đã nạp xong, thêm lớp được
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const markerRef = useRef<Marker | null>(null);
   // Các hàm gọi lại mới nhất, để bản đồ chỉ cần tạo một lần.
-  const callbacks = useRef({ onTap, onMoveEnd, onLocate, onNotice });
-  callbacks.current = { onTap, onMoveEnd, onLocate, onNotice };
+  const callbacks = useRef({ onTap, onMoveEnd, onLocate, onNotice, onRouteSelect });
+  callbacks.current = { onTap, onMoveEnd, onLocate, onNotice, onRouteSelect };
 
   useEffect(() => {
     if (!MAP_KEY || !containerRef.current) return;
@@ -196,9 +205,11 @@ export default function MapView({ initial, pin, flyTo, risk, showRisk, points, s
 
     map.on("load", () => {
       addRiskLayers(map);
+      addRouteLayers(map);
       setReady(true);
     });
     map.on("click", (event) => {
+      if (selectRouteAtPoint(map, event.point, callbacks.current.onRouteSelect)) return;
       const { x, y } = event.point;
       const layers = [POINT_LAYER, ...RISK_LAYERS.map((layer) => layer.id)].filter((id) => map.getLayer(id));
       const hits = layers.length > 0 ? map.queryRenderedFeatures([[x - TAP_RADIUS_PX, y - TAP_RADIUS_PX], [x + TAP_RADIUS_PX, y + TAP_RADIUS_PX]], { layers }) : [];
@@ -269,6 +280,14 @@ export default function MapView({ initial, pin, flyTo, risk, showRisk, points, s
     map.setLayoutProperty(POINT_LAYER, "visibility", showPoints ? "visible" : "none");
   }, [ready, points, showPoints]);
 
+  const lastRouteRevision = useRef(0);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    const fitToRoutes = directionsOpen && routes.length > 0 && routeRevision !== lastRouteRevision.current;
+    lastRouteRevision.current = routeRevision;
+    updateRouteLayers(map, routes, selectedRouteId, directionOrigin, directionDestination, fitToRoutes);
+  }, [ready, routes, selectedRouteId, routeRevision, directionOrigin, directionDestination, directionsOpen]);
   if (!MAP_KEY) {
     return (
       <div className="flex h-full items-center justify-center p-6 text-center text-slate-700">

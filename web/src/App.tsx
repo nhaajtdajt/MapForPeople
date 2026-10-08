@@ -3,10 +3,12 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { api, isAbort, type City, type CityKey, type FloodPoints, type Health, type PlaceDetail, type RiskState } from "./api";
 import LayersPanel from "./components/LayersPanel";
 import PlaceCard, { type Pin } from "./components/PlaceCard";
+import DirectionsPanel from "./components/DirectionsPanel";
 import SearchBar from "./components/SearchBar";
 import StatusChip from "./components/StatusChip";
 import { floodNote, riskLine } from "./lib/floodnote";
 import { loadView, saveView } from "./lib/viewstore";
+import { useDirections } from "./lib/useDirections";
 import MapView, { type FlyTarget, type MapHit, type MapViewState } from "./MapView";
 
 // Khung nhìn khi mở lần đầu: trung tâm TP.HCM (trùng config.py). Đổi thành phố thì lấy tâm từ /api/cities.
@@ -32,7 +34,8 @@ export default function App() {
   const [center, setCenter] = useState({ lat: initial.center[1], lon: initial.center[0] });
   const [notice, setNotice] = useState<string | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
-  const [, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
+  const directions = useDirections();
 
   const cityRef = useRef(cityKey);
   cityRef.current = cityKey;
@@ -89,6 +92,7 @@ export default function App() {
   }, []);
 
   const handleTap = useCallback((lat: number, lon: number, tapped: MapHit | null) => {
+    if (directions.handleMapTap(lat, lon)) return;
     reverseRef.current?.abort();
     const controller = new AbortController();
     reverseRef.current = controller;
@@ -102,7 +106,7 @@ export default function App() {
       .catch((error) => {
         if (!isAbort(error)) setPin({ lat, lon, name: "", address: "", loading: false });
       });
-  }, []);
+  }, [directions.handleMapTap]);
 
   const handlePick = useCallback(
     (place: PlaceDetail) => {
@@ -138,15 +142,22 @@ export default function App() {
   const riskView = risk?.layer && now ? { url: risk.layer.url, rain: now.rain.state, tide: now.tide.state } : null;
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: pin ? (note ? "20rem" : "13rem") : "0px" }}>
+    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: directions.isOpen ? "50dvh" : pin ? (note ? "20rem" : "13rem") : "0px" }}>
       <MapView
         initial={initial}
-        pin={pin}
+        pin={directions.isOpen ? null : pin}
         flyTo={flyTo}
         risk={riskView}
         showRisk={showRisk}
         points={points}
         showPoints={showPoints}
+        routes={directions.routes}
+        selectedRouteId={directions.selectedRouteId}
+        routeRevision={directions.routeRevision}
+        directionOrigin={directions.origin}
+        directionDestination={directions.destination}
+        directionsOpen={directions.isOpen}
+        onRouteSelect={directions.selectRoute}
         onTap={handleTap}
         onMoveEnd={handleMoveEnd}
         onLocate={(lat, lon, accuracy) => setUserLocation({ lat, lon, accuracy })}
@@ -185,7 +196,16 @@ export default function App() {
           onClose={() => setLayersOpen(false)}
         />
       )}
-      {pin && <PlaceCard pin={pin} flood={note} onClose={closePin} />}
+      {pin && !directions.isOpen && (
+        <PlaceCard
+          pin={pin}
+          flood={note}
+          onClose={closePin}
+          onDirectionsTo={() => directions.startTo(pin, userLocation)}
+          onDirectionsFrom={() => directions.startFrom(pin)}
+        />
+      )}
+      <DirectionsPanel directions={directions} near={center} />
 
       {notice && (
         <div role="status" className="pointer-events-none absolute inset-x-0 top-28 z-30 flex justify-center px-4">

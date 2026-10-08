@@ -3,6 +3,7 @@
 import type { FeatureCollection, Point } from "geojson";
 
 import type { DayState } from "./lib/risk";
+import type { RouteRequestParams } from "./lib/directions";
 
 const BASE: string = import.meta.env.VITE_API_BASE ?? "";
 
@@ -90,6 +91,35 @@ export interface FloodPointProps {
 }
 
 export type FloodPoints = FeatureCollection<Point, FloodPointProps> & { source: string };
+export interface RouteStep {
+  name: string;
+  distance_m: number;
+  duration_s: number;
+  turn: string;
+}
+
+export interface RouteOption {
+  id: number;
+  kind: string;
+  recommended: boolean;
+  long_detour: boolean;
+  distance_m: number;
+  duration_s: number;
+  arrive_at: string;
+  steps: RouteStep[];
+  geometry: { type: "LineString"; coordinates: [number, number][] };
+}
+
+export interface RouteResponse {
+  routes: RouteOption[];
+  snapped: {
+    origin: { lat: number; lon: number; distance_m: number };
+    destination: { lat: number; lon: number; distance_m: number };
+  };
+  traffic: { source: string; observed_at: string | null };
+  advice: string | null;
+  notes: string[];
+}
 
 type Params = Record<string, string | number | undefined>;
 
@@ -130,6 +160,7 @@ export const api = {
     getJson<ReverseResult>("/api/places/reverse", { lat, lon }, signal),
   risk: (city: CityKey, signal?: AbortSignal) => getJson<RiskState>("/api/risk", { city }, signal),
   floodPoints: (city: CityKey, signal?: AbortSignal) => getJson<FloodPoints>("/api/risk/points", { city }, signal),
+  route: (params: RouteRequestParams, signal?: AbortSignal) => getJson<RouteResponse>("/api/route", { ...params }, signal),
 };
 
 /** Đường dẫn đầy đủ tới một tài nguyên của máy chủ, cho những chỗ MapLibre tự tải (lớp tuyến). */
