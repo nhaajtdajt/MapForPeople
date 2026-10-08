@@ -136,8 +136,12 @@ def save_cameras(day: Path, now: datetime) -> tuple[int, int]:
         return bool(img)
 
     with ThreadPoolExecutor(8) as pool:
-        ok = sum(pool.map(one, wl))
-    return ok, len(wl)
+        got = list(pool.map(one, wl))
+        missed = [cam for cam, ok in zip(wl, got) if not ok]
+        if missed:  # cổng đôi lúc trả chậm khi hỏi dồn: thử lại một lượt cho những camera hụt
+            time.sleep(3)
+            got = [ok for ok in got if ok] + list(pool.map(one, missed))
+    return sum(got), len(wl)
 
 
 def cycle(last_model_hour: int | None) -> int | None:
