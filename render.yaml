@@ -1,0 +1,22 @@
+# Triển khai lên Render: New > Blueprint > chọn repo này, nhánh web. Xem deploy/README.md.
+services:
+  - type: web
+    name: mapforpeople
+    runtime: docker
+    branch: web
+    plan: free
+    region: singapore
+    healthCheckPath: /api/health
+    envVars:
+      - key: GOONG_API_KEY
+        sync: false
+      - key: VITE_GOONG_MAP_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY_2
+        sync: false
+      - key: GEMINI_API_KEY_3
+        sync: false
+      - key: REFRESH_MINUTES
+        value: "60"

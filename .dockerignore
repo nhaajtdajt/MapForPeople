@@ -2,7 +2,9 @@
 .venv
 .env
 .env.local
-data
+data/raw
+data/sample
+data/*.sqlite
 docs
 tests
 tools

@@ -1,8 +1,25 @@
 # Đưa sản phẩm lên máy chủ
 
-Một ảnh Docker chứa cả máy chủ lẫn giao diện. Mô hình, mạng đường và báo cáo của người dùng nằm trong thư mục `data/` của máy, gắn vào container.
+Một ảnh Docker chứa cả máy chủ lẫn giao diện, kèm mô hình và mạng đường của TP.HCM.
 
-## Lần đầu, trên một máy Ubuntu
+## Cách nhanh nhất: Render
+
+1. Đăng nhập [render.com](https://render.com) bằng tài khoản GitHub có repo này.
+2. Bấm **New** > **Blueprint**, chọn repo `MapForPeople`. Render đọc file `render.yaml` ở nhánh `web`.
+3. Render hỏi giá trị của năm khóa: `GOONG_API_KEY`, `VITE_GOONG_MAP_KEY`, `GEMINI_API_KEY`, `GEMINI_API_KEY_2`, `GEMINI_API_KEY_3`. Chép từ file `.env` trên máy mình. Khóa Gemini nào chưa có thì để trống.
+4. Bấm **Apply**. Lần dựng đầu mất khoảng 5 tới 10 phút. Xong thì có đường dẫn dạng `https://mapforpeople.onrender.com`, đã có HTTPS.
+
+Ba điều cần biết về gói miễn phí của Render:
+
+- Máy ngủ sau 15 phút không ai vào; lần mở kế tiếp mất khoảng một phút để thức dậy. Trước khi trình diễn, mở trang trước vài phút.
+- Bộ nhớ 512 MB. Máy chủ của ta dùng đỉnh khoảng 370 MB (đo trên máy cá nhân). Nếu Render báo hết bộ nhớ thì đổi sang gói có 2 GB.
+- Không có ổ đĩa giữ lại: báo ngập của người dùng mất mỗi khi máy khởi động lại hoặc dựng lại.
+
+Đổi mã thì chỉ cần push lên nhánh `web`, Render tự dựng lại.
+
+## Tự chạy trên một máy Ubuntu
+
+Mô hình, mạng đường và báo cáo của người dùng nằm trong thư mục `data/` của máy, gắn vào container.
 
 ```bash
 # 1. Cài Docker

@@ -16,6 +16,10 @@ RUN pip install --no-cache-dir -r requirements-run.txt
 COPY src src
 RUN pip install --no-cache-dir --no-deps .
 COPY --from=web /app/web/dist web/dist
+# Mô hình và mạng đường đi cùng ảnh, để chạy được ở nơi không gắn ổ đĩa (Render). docker-compose gắn data/ của máy đè lên.
+COPY data/model /data/model
+COPY data/processed /data/processed
 ENV FLOODRISK_DATA=/data FLOODRISK_WEB_DIST=/app/web/dist REFRESH_MINUTES=60 PYTHONUNBUFFERED=1
 EXPOSE 8000
-CMD ["uvicorn", "floodrisk.api.main:create_app", "--factory", "--host", "0.0.0.0", "--port", "8000"]
+# Render và các nền tảng tương tự chỉ định cổng qua biến PORT.
+CMD ["sh", "-c", "uvicorn floodrisk.api.main:create_app --factory --host 0.0.0.0 --port ${PORT:-8000}"]
