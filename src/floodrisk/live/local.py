@@ -30,6 +30,11 @@ GAUGE_ALERT = (50.0, 80.0)  # tương tự, cho báo động
 TIDE_WATCH_M = 1.40  # báo động 1 tại Phú An
 TIDE_ALERT_M = 1.50  # báo động 2 tại Phú An
 MAX_GAUGE_LAG = timedelta(hours=2)  # trạm im lặng lâu hơn thế thì không dùng
+# Cổng tạo dòng của giờ vừa hết ngay đầu giờ, nhưng ở 14 trạm (Bến Cát, Thuận An, Củ Chi...) dòng đó là số 0 giữ chỗ, 19 tới 32
+# phút sau mới có số thật (60 lượt ghi ngày 08/10: 21 trong 52 giờ-trạm có mưa; 13 trạm khác có số ngay). Không phân biệt được
+# số 0 thật với số 0 giữ chỗ, nên trong SETTLE đầu giờ lấy số lớn hơn giữa dòng mới nhất và giờ trước. Giá phải trả: mưa tạnh
+# thật thì trạng thái của trạm hạ chậm hơn, nhiều nhất bằng SETTLE.
+SETTLE = timedelta(minutes=35)
 VN = timezone(timedelta(hours=7))
 
 
@@ -44,7 +49,10 @@ class Local:
 
 
 def gauge_inputs(hours: list[tuple[datetime, float]], now: datetime) -> dict | None:
-    """Ba con số của một trạm: mưa giờ gần nhất, mưa 3 giờ lớn nhất trong 6 giờ qua, tổng 24 giờ qua. None nếu trạm im lặng."""
+    """Ba con số của một trạm: mưa giờ gần nhất đã có số, mưa 3 giờ lớn nhất trong 6 giờ qua, tổng 24 giờ qua. None nếu trạm im lặng.
+
+    `reported_at` là giờ kết thúc của con số được dùng làm mưa giờ gần nhất (xem SETTLE).
+    """
     past = [(t, v) for t, v in hours if t <= now + timedelta(minutes=5)]
     if not past or now - past[-1][0] > MAX_GAUGE_LAG:
         return None
@@ -53,8 +61,12 @@ def gauge_inputs(hours: list[tuple[datetime, float]], now: datetime) -> dict | N
     last6 = series[series.index > end - timedelta(hours=6)]
     grid = pd.date_range(end - timedelta(hours=5), end, freq="h")
     filled = last6.reindex(grid).fillna(0.0)  # giờ trạm không báo coi như không mưa
-    return {"last_1h_mm": round(float(series.iloc[-1]), 1), "max_3h_mm": round(float(filled.rolling(3).sum().max()), 1),
-            "total_24h_mm": round(float(series[series.index > end - timedelta(hours=24)].sum()), 1), "reported_at": end.isoformat()}
+    last_mm, last_at = float(series.iloc[-1]), end
+    before = series.get(end - timedelta(hours=1))
+    if now - end < SETTLE and before is not None and float(before) > last_mm:
+        last_mm, last_at = float(before), end - timedelta(hours=1)
+    return {"last_1h_mm": round(last_mm, 1), "max_3h_mm": round(float(filled.rolling(3).sum().max()), 1),
+            "total_24h_mm": round(float(series[series.index > end - timedelta(hours=24)].sum()), 1), "reported_at": last_at.isoformat()}
 
 
 def gauge_state_of(last_1h_mm: float, max_3h_mm: float) -> int:

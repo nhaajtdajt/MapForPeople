@@ -39,6 +39,7 @@ MODEL = SIBLINGS / "flood_prediction_models" / "models"
 VN = timezone(timedelta(hours=7))
 UA = {"User-Agent": "floodrisk-hackathon/0.1 (bo ghi du lieu)"}
 STEP_S = 600
+RADAR_READY_S = 420  # ảnh radar có trên cổng 3 tới 6 phút sau giờ ghi trên ảnh (đo sáng 09/10): mỗi lượt chạy ở phút thứ 7 của mốc 10 phút
 TIDE_ACTIVE_M = 1.30
 RAIN_ACTIVE_MM = 5.0
 RADAR = "http://hymetnet.gov.vn/dataout_web/NHB/{d:%Y%m%d}/NHB_{d:%Y%m%d%H%M}_CMAX00.png"
@@ -83,7 +84,7 @@ def save_radar(day: Path) -> int:
     saved = 0
     utc = datetime.now(timezone.utc).replace(second=0, microsecond=0)
     utc = utc.replace(minute=utc.minute // 10 * 10)
-    for back in (10, 20, 30):
+    for back in (0, 10, 20, 30):  # 0: ảnh của mốc vừa qua; trước đây bỏ qua nên radar luôn cũ thêm 10 phút
         t = utc - timedelta(minutes=back)
         out = day / "radar" / f"NHB_{t:%Y%m%d%H%M}.png"
         if out.exists():
@@ -295,14 +296,19 @@ def cycle(last_model_hour: int | None) -> int | None:
     return last_model_hour
 
 
+def seconds_to_next_cycle(now_s: float) -> float:
+    """Số giây chờ tới lượt kế: RADAR_READY_S sau mốc 10 phút gần nhất sắp tới. Còn dưới 2 phút thì đợi mốc sau, để hai lượt không dính nhau."""
+    wait = (RADAR_READY_S - now_s % STEP_S) % STEP_S
+    return wait if wait >= 120 else wait + STEP_S
+
+
 def main() -> None:
     LIVE.mkdir(parents=True, exist_ok=True)
     log("bắt đầu ghi; tạo file data/raw/live/STOP để dừng")
     last_model_hour = None
     while not (LIVE / "STOP").exists():
-        started = time.time()
         last_model_hour = cycle(last_model_hour)
-        time.sleep(max(5.0, STEP_S - (time.time() - started) % STEP_S))
+        time.sleep(seconds_to_next_cycle(time.time()))
     log("thấy file STOP, dừng")
 
 

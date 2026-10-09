@@ -35,8 +35,33 @@ def _source(mm_per_hour: float, tide_m: float, last=NOW.replace(minute=0)):
 
 def test_gauge_inputs_follow_the_model_windows():
     hours = [(NOW.replace(minute=0) - timedelta(hours=k), mm) for k, mm in enumerate([1.0, 20.0, 30.0, 0.0, 5.0, 0.0, 0.0, 99.0])][::-1]
-    inputs = local.gauge_inputs(hours, NOW)
+    inputs = local.gauge_inputs(hours, NOW + timedelta(minutes=20))  # 14:40: số của giờ 13-14h đã chốt
     assert inputs["last_1h_mm"] == 1.0 and inputs["max_3h_mm"] == 51.0 and inputs["total_24h_mm"] == 155.0  # 99 mm nằm ngoài 6 giờ
+
+
+def test_a_fresh_zero_does_not_hide_the_hour_before():
+    # Bến Cát 08/10: dòng của giờ vừa hết hiện 0 lúc 16:01 và 16:11, tới 16:21 mới ra 34,6 mm
+    top = NOW.replace(hour=16, minute=0)
+    placeholder = [(top - timedelta(hours=1), 34.6), (top, 0.0)]
+    early = local.gauge_inputs(placeholder, top + timedelta(minutes=10))
+    assert early["last_1h_mm"] == 34.6 and early["reported_at"] == (top - timedelta(hours=1)).isoformat()
+    settled = local.gauge_inputs(placeholder, top + timedelta(minutes=40))
+    assert settled["last_1h_mm"] == 0.0 and settled["reported_at"] == top.isoformat()  # sau 35 phút thì số 0 là thật
+    landed = local.gauge_inputs([(top - timedelta(hours=1), 5.0), (top, 34.6)], top + timedelta(minutes=10))
+    assert landed["last_1h_mm"] == 34.6 and landed["reported_at"] == top.isoformat()  # số mới lớn hơn thì dùng ngay
+    alone = local.gauge_inputs([(top, 0.0)], top + timedelta(minutes=10))
+    assert alone["last_1h_mm"] == 0.0  # không có giờ trước để so
+
+
+def test_routes_keep_their_state_while_the_new_hour_is_still_a_placeholder():
+    top = NOW.replace(hour=16, minute=0)
+    hours = [(top - timedelta(hours=k), mm) for k, mm in enumerate([0.0, 35.0, 0.0, 0.0])][::-1]  # 35 mm trong giờ 14-15h
+    source = SimpleNamespace(rain_gauges=lambda: [{"name": "Trạm thử", "lat": 10.80, "lon": 106.70}],
+                             gauge_hours=lambda g: hours, tide_point=lambda t: (0.5, "measured"))
+    early = local.read(_model(), _hour(), source, top + timedelta(minutes=10))
+    assert list(early.rain_state) == [levels.WATCH, levels.WATCH, levels.QUIET]  # trước đây tụt về yên ngay 16:01
+    settled = local.read(_model(), _hour(), source, top + timedelta(minutes=40))
+    assert list(settled.rain_state) == [levels.QUIET] * 3
 
 
 def test_silent_gauge_is_ignored():
