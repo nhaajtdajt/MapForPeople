@@ -11,8 +11,11 @@ def test_built_web_app_is_served_next_to_the_api(data, monkeypatch, tmp_path):
     (dist / "assets" / "app.js").write_text("console.log(1)", encoding="utf-8")
     monkeypatch.setenv("FLOODRISK_WEB_DIST", str(dist))
     client = TestClient(create_app())
-    assert "Bản đồ nguy cơ ngập" in client.get("/").text
-    assert client.get("/assets/app.js").status_code == 200
+    page = client.get("/")
+    assert "Bản đồ nguy cơ ngập" in page.text
+    assert page.headers["cache-control"] == "no-cache"  # trang luôn hỏi lại máy chủ, để thấy ngay bản vừa triển khai
+    asset = client.get("/assets/app.js")
+    assert asset.status_code == 200 and "immutable" in asset.headers["cache-control"]  # tên file đổi theo nội dung
     assert client.get("/api/health").json()["ok"] is True
     assert client.get("/api/khong-co").status_code == 404
 

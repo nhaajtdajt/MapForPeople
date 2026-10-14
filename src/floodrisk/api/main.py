@@ -9,6 +9,19 @@ from floodrisk.api.goong import Goong
 from floodrisk.live import hydro
 
 
+class WebApp(StaticFiles):
+    """Giao diện đã dựng. Trang (index.html) không được giữ lại trong trình duyệt: trước đây trình duyệt dùng lại trang cũ sau
+    mỗi lần triển khai, nên vẫn chạy mã cũ. Các file trong assets/ có tên đổi theo nội dung nên giữ lâu được."""
+
+    async def get_response(self, path, scope):
+        response = await super().get_response(path, scope)
+        if path.replace("\\", "/").startswith("assets/"):  # trên Windows đường dẫn dùng dấu \
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
+        return response
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title="Bản đồ nguy cơ ngập",
@@ -26,5 +39,5 @@ def create_app() -> FastAPI:
     # Gắn sau cùng để mọi đường dẫn /api/... vẫn do các hàm ở trên trả lời.
     dist = settings.web_dist()
     if (dist / "index.html").exists():
-        app.mount("/", StaticFiles(directory=dist, html=True), name="web")
+        app.mount("/", WebApp(directory=dist, html=True), name="web")
     return app
