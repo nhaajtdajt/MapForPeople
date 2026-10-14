@@ -57,10 +57,28 @@ Các bậc là số tròn đặt trước khi chấm, nhưng mới thử trên m
 
 **Nhãn "Đang dùng bản giả"** không còn hiện trên dữ liệu thật (báo cáo người dùng là thật).
 
-## 4. Chưa chấm được
+## 4. Mưa: chấm trên ngày 08/10 bằng ảnh camera
 
-- **Mưa**: 7 ngày qua chỉ có 08/10 mưa to (7 trạm vượt 30 mm/giờ). Không tìm thấy tin ngập do mưa từ 10 tới 13/10. Cần thêm ngày mưa; bộ ghi (`tools/ghi_du_lieu.py`) lưu đủ để chấm khi có.
-- **Camera Gemini**: chưa gặp cảnh ngập thật.
+Cổng chỉ giữ 7 ngày mưa theo giờ, và trong đó chỉ ngày 08/10 có mưa to ở TP.HCM. Bộ ghi đã lưu ảnh 167 camera mỗi 10 phút từ 12:00 tới 22:48 ngày 08/10, cùng radar từ 20:20 ngày 07/10.
+
+**Chỗ mưa to nhất có camera:** trạm Nguyễn Thiện Thuật đo 29,6 mm trong giờ 20–21h. Mình mở ảnh lúc 21:00 và 21:10 của 8 camera trên các đường mô hình xếp dễ ngập do mưa, trong 3 km quanh trạm (Phan Đăng Lưu – Nơ Trang Long, Đinh Bộ Lĩnh – Bùi Đình Túy, Đinh Bộ Lĩnh – Bạch Đằng, Hàng Xanh, Xô Viết Nghệ Tĩnh – Nguyễn Xí, Xô Viết Nghệ Tĩnh – Phan Văn Hân, Nguyễn Hữu Cảnh – Nguyễn Bỉnh Khiêm, Nguyễn Hữu Cảnh – Ngô Tất Tố): cả 8 đường chỉ ướt, vạch kẻ đường còn thấy, không có nước đọng ngang đường. Gemini đọc 14 camera trong khu radar thấy mưa tối đó cũng chỉ thấy "ướt". Không tìm thấy tin ngập do mưa ngày 08/10/2026 trên báo.
+
+**Tô màu do mưa từng giờ ngày 08/10** (số tuyến đỏ / vàng):
+
+| Giờ | Trạm lớn nhất | Quy tắc chiều 08/10 | Sau khi nâng radar lên 20 (tối 08/10) | Hiện tại |
+|---|---|---|---|---|
+| 06h–11h (trời khô) | 0,1–0,3 mm | 275–1.345 / 894–3.373 mỗi giờ | 41–1.034 / 580–3.029 | 0 / 0–303 |
+| 17h | 30,6 mm | 958 / 5.044 | 260 / 2.309 | 0 / 135 |
+| 21h | 29,6 mm | 2.600 / 5.120 | 556 / 3.932 | 0 / 268 |
+| Cả ngày, km-giờ | | 5.236 đỏ, 13.184 vàng | 1.681 đỏ, 9.874 vàng | **0 đỏ, 484 vàng** |
+
+Lúc trời khô buổi sáng, quy tắc cũ vẫn tô hàng trăm tuyến đỏ chỉ vì nhiễu mặt đất của radar. 303 tuyến vàng lúc 06h hiện tại là do trạm Lê Đình Cẩn đo 50,2 mm lúc 01h (mưa 3 giờ trong 6 giờ qua).
+
+**Chưa chứng minh được là không bỏ sót.** Trong số liệu có được, camera không gặp cảnh ngập do mưa nào, nên chưa đo được quy tắc mới bắt được bao nhiêu trận ngập thật. Báo đưa tin hầm nhà ở Gò Vấp ngập hơn 1 m do mưa từ chiều 07/10 tới sáng 08/10. Trong khung giờ có số liệu (từ 20h ngày 07/10), các trạm quanh Gò Vấp chỉ đo 7,5–8 mm; quy tắc cũ tô Gò Vấp lúc 00h (10 đỏ, 166 vàng, theo radar 12 mm/giờ), quy tắc mới không tô. Trận mưa gây ngập nhiều khả năng rơi vào buổi chiều, trước khi bộ ghi chạy, nên đây có thể là một lần bỏ sót, có thể không. Cần chạy bộ ghi vào ngày mưa tới để chấm.
+
+## 5. Kiểm trên đỉnh triều mới (ngoài đợt dùng để chấm)
+
+Tối 14/10, lúc 18:58, app dự báo Phú An lúc 19:00 là 1,54 m, khi số đo thật mới nhất là của 07:00 sáng (đoán trước 12 giờ). Số đo thật lúc 19:00: **1,54 m**. Theo bậc mới, ở mức này bản đồ tô 2% đầu bảng triều đỏ và tới 5% có màu, thay cho 20% như trước.
 
 ## Nguồn tin ngập
 
