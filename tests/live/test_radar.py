@@ -58,5 +58,5 @@ def test_dry_background_is_subtracted_before_the_thresholds(tmp_path):
 def test_gauges_use_millimetre_thresholds():
     assert local.gauge_state_of(29.6, 29.6) == levels.QUIET  # tối 08/10: 29,6 mm/giờ, camera quanh trạm chỉ thấy đường ướt
     assert local.gauge_state_of(30.0, 30.0) == levels.WATCH and local.gauge_state_of(0.0, 50.0) == levels.WATCH
-    assert local.gauge_state_of(50.0, 50.0) == levels.ALERT and local.gauge_state_of(5.0, 80.0) == levels.ALERT
-    assert local.gauge_state_of(49.0, 79.0) == levels.WATCH
+    assert local.gauge_state_of(36.0, 36.0) == levels.ALERT  # trưa 06/10: trạm Cô Bắc 36 mm/giờ, Lê Lợi, Bùi Viện ngập
+    assert local.gauge_state_of(5.0, 80.0) == levels.ALERT and local.gauge_state_of(34.9, 79.0) == levels.WATCH

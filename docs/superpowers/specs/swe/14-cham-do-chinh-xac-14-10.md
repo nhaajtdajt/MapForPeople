@@ -74,7 +74,17 @@ Cổng chỉ giữ 7 ngày mưa theo giờ, và trong đó chỉ ngày 08/10 có
 
 Lúc trời khô buổi sáng, quy tắc cũ vẫn tô hàng trăm tuyến đỏ chỉ vì nhiễu mặt đất của radar. 303 tuyến vàng lúc 06h hiện tại là do trạm Lê Đình Cẩn đo 50,2 mm lúc 01h (mưa 3 giờ trong 6 giờ qua).
 
-**Chưa chứng minh được là không bỏ sót.** Trong số liệu có được, camera không gặp cảnh ngập do mưa nào, nên chưa đo được quy tắc mới bắt được bao nhiêu trận ngập thật. Báo đưa tin hầm nhà ở Gò Vấp ngập hơn 1 m do mưa từ chiều 07/10 tới sáng 08/10. Trong khung giờ có số liệu (từ 20h ngày 07/10), các trạm quanh Gò Vấp chỉ đo 7,5–8 mm; quy tắc cũ tô Gò Vấp lúc 00h (10 đỏ, 166 vàng, theo radar 12 mm/giờ), quy tắc mới không tô. Trận mưa gây ngập nhiều khả năng rơi vào buổi chiều, trước khi bộ ghi chạy, nên đây có thể là một lần bỏ sót, có thể không. Cần chạy bộ ghi vào ngày mưa tới để chấm.
+**Chấm trên ba trận ngập do mưa có thật.** Số giờ mưa to nhất của từng trạm ngày 01/10 và 07/10 (thu từ cổng vndms ngày 08/10, lúc cổng còn giữ) và ngày 06/10 (trạm Cô Bắc 36 mm/giờ); đường bị ngập lấy từ báo: tối 01/10 Nguyễn Văn Khối, Mai Chí Thọ; trưa 06/10 Lê Lợi, Bùi Viện, Lý Tự Trọng, Nguyễn Trung Trực; chiều tối 07/10 Phan Văn Trị, Nguyễn Oanh, Lê Văn Thọ, D5, Nguyễn Hữu Cảnh, Điện Biên Phủ, Xô Viết Nghệ Tĩnh (162 đoạn). Phần này chỉ dùng trạm đo (ảnh radar các ngày đó đã mất).
+
+| Quy tắc trạm mưa | Đoạn bị ngập thật có màu | Trong đó đỏ | Ngày 08/10 không ngập (chỉ trạm): km-giờ đỏ / vàng |
+|---|---|---|---|
+| Chiều 08/10 (vàng từ 15 mm, đỏ từ 30 mm, 5 km) | 140/162 | 105 | 312 / 3.010 |
+| Tối 08/10 (30 / 50 mm, 3 km) | 97/162 | 70 | 0 / 0 |
+| **Hiện tại (30 / 35 mm, 4 km)** | **129/162** | **104** | **0 / 0** |
+
+Quy tắc tối 08/10 sửa quá tay: hết báo nhầm nhưng bỏ sót một phần ba đoạn ngập thật. Quy tắc hiện tại giữ được gần hết phần đỏ của quy tắc cũ (104 so với 105) mà không báo nhầm ngày 08/10. Chạy lại cả ngày 08/10 qua đúng mã của app (trạm và radar cùng lúc): 80 km-giờ đỏ, 592 km-giờ vàng, so với 5.236 và 13.184 của quy tắc chiều 08/10.
+
+Lưu ý: ngưỡng đỏ 35 mm nằm giữa 29,6 mm (không ngập, 08/10) và 36 mm (trung tâm ngập, 06/10), tức được chọn trên chính các trận này; chưa có trận nào khác để thử. Tối 01/10 vẫn sót gần hết Nguyễn Văn Khối và Mai Chí Thọ: trạm gần nhất của hai đường chỉ đo 25 và 32 mm.
 
 ## 5. Kiểm trên đỉnh triều mới (ngoài đợt dùng để chấm)
 

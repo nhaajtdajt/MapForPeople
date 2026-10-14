@@ -56,7 +56,7 @@ def test_a_fresh_zero_does_not_hide_the_hour_before():
 
 def test_routes_keep_their_state_while_the_new_hour_is_still_a_placeholder():
     top = NOW.replace(hour=16, minute=0)
-    hours = [(top - timedelta(hours=k), mm) for k, mm in enumerate([0.0, 35.0, 0.0, 0.0])][::-1]  # 35 mm trong giờ 14-15h
+    hours = [(top - timedelta(hours=k), mm) for k, mm in enumerate([0.0, 32.0, 0.0, 0.0])][::-1]  # 32 mm trong giờ 14-15h: cảnh giác
     source = SimpleNamespace(rain_gauges=lambda: [{"name": "Trạm thử", "lat": 10.80, "lon": 106.70}],
                              gauge_hours=lambda g: hours, tide_point=lambda t: (0.5, "measured"))
     early = local.read(_model(), _hour(), source, top + timedelta(minutes=10))

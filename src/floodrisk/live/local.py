@@ -5,11 +5,12 @@ mưa to chỉ rơi ở ngoại thành, và bản đồ đỏ gần hết nội t
 tuyến nằm trong RADIUS_M quanh trạm nhận trạng thái của trạm, tính bằng ngưỡng mm ghi ở GAUGE_WATCH và GAUGE_ALERT.
 Công thức của Mô hình 2 không dùng cho trạm: nó được chỉnh trên mưa dự báo, đem mưa đo tại một điểm vào thì 14 mm trong
 3 giờ đã thành "cảnh giác".
-Ngưỡng mm (chốt tối 08/10, phương án E): 30 mm/giờ là mức "có thể ngập" (vàng) chứ không phải "ngập" — ngày 01/10 và 07/10
-các trạm vượt 30 mm trùng với khu báo chí đưa tin ngập, nhưng tối 08/10 trạm Nguyễn Thiện Thuật đo 29,6 mm/giờ mà 8 camera
-trong 1,7 km quanh đó chỉ thấy đường ướt. Mức "rất có thể ngập" (đỏ) đặt ở 50 mm/giờ hoặc 80 mm/3 giờ: con số đặt ra từ
-hai ngày quan sát, chưa hiệu chỉnh; bộ ghi (tools/ghi_du_lieu.py) đang gom trạm, radar và ảnh camera mỗi 10 phút để chỉnh lại.
-Bán kính RADIUS_M là cỡ một ô mưa dông; 5 km trước đây làm một trạm tô 2.215 tuyến nhóm A.
+Ngưỡng mm và bán kính chấm ngày 14/10 trên ba trận ngập do mưa có báo chí đưa tin (tối 01/10, trưa 06/10, chiều tối 07/10:
+162 đoạn của 13 đường bị ngập) và một ngày mưa không ngập (08/10: trạm Nguyễn Thiện Thuật 29,6 mm/giờ, 8 camera quanh đó chỉ thấy
+đường ướt). Quy tắc chiều 08/10 (15/30 mm, 5 km) tô 140/162 đoạn nhưng ngày 08/10 tô 312 km-giờ đỏ và 3.010 km-giờ vàng; quy
+tắc tối 08/10 (30/50 mm, 3 km) không báo nhầm nhưng chỉ tô 97/162. Quy tắc này tô 129/162 (104 đỏ) và không tô gì ngày 08/10.
+Ngưỡng đỏ 35 mm nằm giữa 29,6 mm (không ngập, 08/10) và 36 mm (trung tâm ngập, 06/10): nó được chọn trên chính các trận này,
+chưa có trận nào khác để thử. Bộ ghi (tools/ghi_du_lieu.py) gom trạm, radar và ảnh camera để chấm lại khi có trận mưa mới.
 Tuyến không gần trạm nào đang mưa thì trạng thái mưa là yên, dù mô hình báo gì cho cả thành phố (quyết định của chủ dự án
 ngày 08/10, thay cho quy tắc "chỉ nâng" ở ghi chú 11, QĐ4). Mực nước Phú An từ báo động 1 nâng trạng thái triều lên
 cảnh giác, từ báo động 2 lên báo động. TIDE_WATCH_M, TIDE_ALERT_M do người làm web đặt, chưa hiệu chỉnh.
@@ -24,9 +25,9 @@ import pandas as pd
 
 from floodrisk.model import levels
 
-RADIUS_M = 3000.0
+RADIUS_M = 4000.0
 GAUGE_WATCH = (30.0, 50.0)  # mm trong giờ gần nhất, mm trong 3 giờ: đạt một trong hai là cảnh giác
-GAUGE_ALERT = (50.0, 80.0)  # tương tự, cho báo động
+GAUGE_ALERT = (35.0, 80.0)  # tương tự, cho báo động
 TIDE_WATCH_M = 1.40  # báo động 1 tại Phú An
 TIDE_ALERT_M = 1.50  # báo động 2 tại Phú An (báo động 3 là 1,60 m)
 # Triều càng cao thì càng nhiều tuyến ngập: mỗi bậc là (mực nước Phú An từ, (phần tuyến đầu bảng triều tô đỏ, phần có màu)).
