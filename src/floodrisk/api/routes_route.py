@@ -152,7 +152,7 @@ def register(app: FastAPI, ctx: Context) -> None:
                               "geometry": {"type": "LineString", "coordinates": [[c[0], c[1]] for c in coords]}})
             if avoid is not None:
                 seen = floodcost.exposure(avoid.edges, graph.length_m, flood)
-                worst = lambda f: f["confirmed_m"] + f["history_m"]  # noqa: E731
+                worst = lambda f: (f["confirmed_m"], f["high_m"], f["history_m"])  # noqa: E731
                 if worst(seen) < min(worst(i["flood"]) for i in items):  # chỉ thêm khi nó thật sự né được đường ngập
                     items.append({"kind": "flood_avoid", "engine": "own", "estimated": True, "distance_m": round(avoid.distance_m, 1),
                                   "duration_s": round(avoid.duration_s), "flood": seen, "steps": graph.steps(avoid),
@@ -162,7 +162,9 @@ def register(app: FastAPI, ctx: Context) -> None:
                 item["long_detour"] = item["duration_s"] > LONG_DETOUR * fastest_s
             if flood is not None:
                 ok = [i for i in items if not i["long_detour"]] or items
-                best = min(ok, key=lambda i: (i["flood"]["confirmed_m"], i["flood"]["history_m"], i["duration_s"]))
+                # Ít mét đã xác nhận ngập, rồi ít mét đang ở mức cao, rồi ít mét từng ngập, rồi nhanh hơn. Trước 14/10 bỏ qua mức cao:
+                # lúc triều báo động nó đề xuất đường có 3,6 km đỏ thay cho đường 2,2 km đỏ chỉ vì đường kia có 138 m từng ngập.
+                best = min(ok, key=lambda i: (i["flood"]["confirmed_m"], i["flood"]["high_m"], i["flood"]["history_m"], i["duration_s"]))
             else:
                 best = items[0]
             for index, item in enumerate(items):

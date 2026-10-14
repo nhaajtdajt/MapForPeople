@@ -45,3 +45,15 @@ def test_levels_follow_the_two_factor_rule():
     assert list(levels.route_levels(rain, tide, alert, quiet)) == [2, 1, 0, 0]  # báo động: A lên cao, B lên vừa
     assert list(levels.route_levels(rain, tide, quiet, alert)) == [0, 0, 2, 1]
     assert list(levels.route_levels(rain, tide, watch, alert)) == [1, 0, 2, 1]  # lấy mức lớn hơn giữa hai nguyên nhân
+
+
+def test_rank_order_and_extent_reproduce_the_bands():
+    rng = np.random.default_rng(3)
+    score = rng.random(1001).astype(np.float32)
+    score[10:20] = score[5]  # điểm bằng nhau
+    order = levels.rank_order(score)
+    assert sorted(order) == list(range(1001))
+    bands = levels.live_bands(score)
+    assert (levels.extent_levels(order, (.05, .20)) == bands).all()
+    assert (levels.extent_levels(order, (0.0, 0.0)) == 0).all()
+    assert levels.extent_counts(140236, (.05, .20)) == (7012, 28048)

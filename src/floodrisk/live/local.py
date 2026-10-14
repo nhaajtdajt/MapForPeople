@@ -28,7 +28,15 @@ RADIUS_M = 3000.0
 GAUGE_WATCH = (30.0, 50.0)  # mm trong giờ gần nhất, mm trong 3 giờ: đạt một trong hai là cảnh giác
 GAUGE_ALERT = (50.0, 80.0)  # tương tự, cho báo động
 TIDE_WATCH_M = 1.40  # báo động 1 tại Phú An
-TIDE_ALERT_M = 1.50  # báo động 2 tại Phú An
+TIDE_ALERT_M = 1.50  # báo động 2 tại Phú An (báo động 3 là 1,60 m)
+# Triều càng cao thì càng nhiều tuyến ngập: mỗi bậc là (mực nước Phú An từ, (phần tuyến đầu bảng triều tô đỏ, phần có màu)).
+# Chấm trên tuần 07-14/10/2026: các đường báo chí đưa tin ngập do triều (Trần Xuân Soạn, Phạm Hữu Lầu, Huỳnh Tấn Phát...)
+# chỉ ngập khi Phú An từ 1,60 m. So với quy tắc cũ (từ 1,50 m tô nhóm A đỏ, nhóm B vàng, tức 20% số tuyến), bản đồ bị tô
+# ít hơn 44% số km-giờ cả tuần, ít hơn 61% ở những giờ không có tin ngập, mà lúc đỉnh triều có tin ngập vẫn tô 91% đoạn
+# đường được báo đưa tin (cũ 95%). Các bậc là số tròn đặt trước khi chấm, mới thử trên một đợt triều.
+TIDE_STEPS = ((1.70, (.05, .20)), (1.60, (.05, .10)), (1.50, (.02, .05)), (1.40, (0.0, .02)))
+MODEL_TIDE_EXTENT = {levels.QUIET: (0.0, 0.0), levels.WATCH: (0.0, .05), levels.ALERT: (.05, .20)}  # khi không có số Phú An: nhóm A, B như cũ
+FORECAST_HOURS = 12  # dự báo triều Phú An: trước 24 giờ đoán đúng 12 trong 13 giờ vượt 1,40 m, không lần nào báo nhầm (07-14/10)
 MAX_GAUGE_LAG = timedelta(hours=2)  # trạm im lặng lâu hơn thế thì không dùng
 # Cổng tạo dòng của giờ vừa hết ngay đầu giờ, nhưng ở 14 trạm (Bến Cát, Thuận An, Củ Chi...) dòng đó là số 0 giữ chỗ, 19 tới 32
 # phút sau mới có số thật (60 lượt ghi ngày 08/10: 21 trong 52 giờ-trạm có mưa; 13 trạm khác có số ngay). Không phân biệt được
@@ -46,6 +54,8 @@ class Local:
     rain_state: np.ndarray  # trạng thái mưa của từng tuyến sau khi xét trạm gần nó
     tide_state: int  # trạng thái triều của thành phố sau khi xét Phú An
     errors: list[str] = field(default_factory=list)
+    tide_extent: tuple[float, float] = (0.0, 0.0)  # (phần tuyến đầu bảng triều tô đỏ, phần có màu), xem TIDE_STEPS
+    tide_forecast: list[dict] = field(default_factory=list)  # Phú An từng giờ tới: giờ, mực nước, trạng thái
 
 
 def gauge_inputs(hours: list[tuple[datetime, float]], now: datetime) -> dict | None:
@@ -75,6 +85,13 @@ def gauge_state_of(last_1h_mm: float, max_3h_mm: float) -> int:
     if last_1h_mm >= GAUGE_WATCH[0] or max_3h_mm >= GAUGE_WATCH[1]:
         return levels.WATCH
     return levels.QUIET
+
+
+def tide_extent_of(level_m: float) -> tuple[float, float]:
+    for step, extent in TIDE_STEPS:
+        if level_m >= step:
+            return extent
+    return (0.0, 0.0)
 
 
 def tide_state_of(level_m: float) -> int:
@@ -116,18 +133,32 @@ def read(model, hour, source, now: datetime | None = None) -> Local:
         rain_state = np.full(len(model.routes), hour.rain.state, np.uint8)
         gauges = []
 
-    tide, tide_state = None, hour.tide.state
+    # Có mực nước Phú An thì nó thay cho trạng thái triều của mô hình (triều thiên văn Vũng Tàu cho cả thành phố): số tại sông
+    # Sài Gòn sát hơn, và mức tô màu theo bậc của nó (TIDE_STEPS).
+    tide, tide_state, tide_extent, forecast = None, hour.tide.state, MODEL_TIDE_EXTENT[hour.tide.state], []
     try:
         point = source.tide_point(now)
         if point is not None:
             level_m, kind = float(point[0]), point[1]
             tide = {"station": "Phú An", "level_m": round(level_m, 2), "kind": kind, "state": tide_state_of(level_m)}
-            tide_state = max(tide_state, tide["state"])
+            tide_state, tide_extent = tide["state"], tide_extent_of(level_m)
+            top = now.replace(minute=0, second=0, microsecond=0)
+            for h in range(1, FORECAST_HOURS + 1):
+                ahead = source.tide_point(top + timedelta(hours=h))
+                if ahead is None:
+                    break
+                forecast.append({"time": (top + timedelta(hours=h)).isoformat(), "level_m": round(float(ahead[0]), 2),
+                                 "state": tide_state_of(float(ahead[0]))})
     except Exception as exc:
         errors.append(f"Chưa đọc được mực nước Phú An: {type(exc).__name__}: {exc}")
-    return Local(now, gauges, tide, rain_state, int(tide_state), errors)
+    return Local(now, gauges, tide, rain_state, int(tide_state), errors, tide_extent, forecast)
+
+
+def levels_of(model, rain_state, tide_extent: tuple[float, float]) -> np.ndarray:
+    """Mức của từng tuyến: lớn hơn giữa mức do mưa (theo nhóm mưa) và mức do triều (theo thứ hạng triều và bậc của Phú An)."""
+    return np.maximum(levels.cause_levels(model.bands_rain, rain_state), levels.extent_levels(model.tide_order, tide_extent))
 
 
 def route_levels(model, local: Local) -> np.ndarray:
     """Mức của từng tuyến sau khi xét số đo tại chỗ."""
-    return levels.route_levels(model.bands_rain, model.bands_tide, local.rain_state, local.tide_state)
+    return levels_of(model, local.rain_state, local.tide_extent)

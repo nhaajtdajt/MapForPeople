@@ -8,7 +8,7 @@ import DirectionsPanel from "./components/DirectionsPanel";
 import ReportSheet from "./components/ReportSheet";
 import SearchBar from "./components/SearchBar";
 import StatusChip from "./components/StatusChip";
-import { floodNote, riskLine } from "./lib/floodnote";
+import { floodNote, riskLine, tideExtentOf } from "./lib/floodnote";
 import { loadView, saveView } from "./lib/viewstore";
 import { useDirections } from "./lib/useDirections";
 import MapView, { type FlyTarget, type MapHit, type MapViewState } from "./MapView";
@@ -197,7 +197,7 @@ export default function App() {
 
   const now = risk?.hours[0] ?? null;
   const note = pin ? floodNote(hit, now, risk) : null;
-  const riskView = risk?.layer ? { url: risk.layer.url, rain: risk.states.rain, tide: risk.states.tide, overrides: risk.overrides } : null;
+  const riskView = risk?.layer ? { url: risk.layer.url, rain: risk.states.rain, tide: tideExtentOf(risk), overrides: risk.overrides } : null;
   const sheet = camera ? "24rem" : pin ? (note ? "20rem" : "13rem") : "0px";
 
   return (

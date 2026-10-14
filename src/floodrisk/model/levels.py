@@ -40,6 +40,31 @@ def live_bands(hybrid_score) -> np.ndarray:
     return route_bands(score, score, np.ones(len(score), bool))
 
 
+def rank_order(score) -> np.ndarray:
+    """Vị trí của từng tuyến trong đúng thứ tự `live_bands` dùng để xếp nhóm (0 là điểm cao nhất).
+
+    Nhóm A là vị trí dưới ceil(5% số tuyến), nhóm B là tới ceil(20%). Ghi chú của tác giả web, không có trong repo mô hình.
+    """
+    score = np.asarray(score, np.float32)
+    order = np.lexsort((-score, -score))
+    position = np.empty(len(score), np.int32)
+    position[order] = np.arange(len(score), dtype=np.int32)
+    return position
+
+
+def extent_counts(n: int, extent: tuple[float, float]) -> tuple[int, int]:
+    """Số tuyến đầu bảng tô đỏ và số tuyến đầu bảng có màu, với `extent` = (phần tô đỏ, phần có màu), làm tròn lên như `route_bands`."""
+    red, coloured = (int(np.ceil(q * n - 1e-9)) if q > 0 else 0 for q in extent)
+    return red, max(red, coloured)
+
+
+def extent_levels(position: np.ndarray, extent: tuple[float, float]) -> np.ndarray:
+    """Mức của từng tuyến khi tô phần đầu bảng xếp hạng: đầu bảng cao, phần kế tiếp vừa. (0,05; 0,20) cho đúng nhóm A cao, B vừa."""
+    position = np.asarray(position)
+    red, coloured = extent_counts(len(position), extent)
+    return np.where(position < red, HIGH, np.where(position < coloured, MEDIUM, LOW)).astype(np.uint8)
+
+
 def day_state(trigger: float, t_watch: float, t_alert: float) -> int:
     """0 yên, 1 cảnh giác, 2 báo động."""
     if trigger < t_watch:

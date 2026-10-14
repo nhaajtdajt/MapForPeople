@@ -81,6 +81,7 @@ class CityModel:
         self.routes = pd.read_parquet(config.route_table_path(city))
         self.bands_rain = self.routes.band_rain.to_numpy(np.uint8)
         self.bands_tide = self.routes.band_tide.to_numpy(np.uint8)
+        self.tide_order = self.routes.tide_order.to_numpy(np.int32)  # vị trí trong bảng xếp hạng triều, 0 là dễ ngập nhất
         self.rain_cfg = _read_json(version / "rain_trigger.json")
         final = _read_json(root / "final_config.json")
         self.rain_limits = (float(final["q_watch"]), float(final["q_alert"]))

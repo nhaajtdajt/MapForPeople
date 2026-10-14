@@ -20,7 +20,7 @@ import { useEffect, useRef, useState } from "react";
 import { serverUrl, type Camera, type FloodPointProps, type FloodPoints, type FloodReport, type RouteOption } from "./api";
 import { addRouteLayers, selectRouteAtPoint, updateRouteLayers } from "./lib/routeLayer";
 import type { DirectionEndpoint } from "./lib/useDirections";
-import { levelExpression, type DayState, type RouteProps } from "./lib/risk";
+import { levelExpression, NO_TIDE, type DayState, type RouteProps, type TideExtent } from "./lib/risk";
 
 setWorkerUrl(workerUrl);
 
@@ -60,7 +60,7 @@ export type MapHit =
 export interface RiskView {
   url: string; // đường dẫn lớp tuyến trên máy chủ, đổi khi mô hình được dựng lại
   rain: DayState;
-  tide: DayState;
+  tide: TideExtent; // phần tô theo triều, xem lib/risk.ts
   overrides: Record<string, number>; // mức riêng của vài tuyến, xem lib/risk.ts
 }
 
@@ -70,7 +70,7 @@ function riskFilter(level: number, major: boolean, risk: Pick<RiskView, "rain" |
   return ["all", ["==", levelNow, level], major ? isMajor : ["!", isMajor]] as unknown as FilterSpecification;
 }
 
-const QUIET: Pick<RiskView, "rain" | "tide" | "overrides"> = { rain: "quiet", tide: "quiet", overrides: {} };
+const QUIET: Pick<RiskView, "rain" | "tide" | "overrides"> = { rain: "quiet", tide: NO_TIDE, overrides: {} };
 
 function pointFeatures<T extends { lat: number; lon: number }>(items: T[]): FeatureCollection {
   return {
@@ -315,17 +315,17 @@ export default function MapView({ initial, pin, flyTo, risk, showRisk, points, s
   }, [ready, riskUrl]);
 
   const rain = risk?.rain ?? "quiet";
-  const tide = risk?.tide ?? "quiet";
+  const tideKey = JSON.stringify(risk?.tide ?? NO_TIDE);
   const overridesKey = JSON.stringify(risk?.overrides ?? {});
   useEffect(() => {
     const map = mapRef.current;
     if (!map || !ready) return;
-    const now = { rain, tide, overrides: JSON.parse(overridesKey) as Record<string, number> };
+    const now = { rain, tide: JSON.parse(tideKey) as TideExtent, overrides: JSON.parse(overridesKey) as Record<string, number> };
     for (const layer of RISK_LAYERS) {
       map.setFilter(layer.id, riskFilter(layer.level, layer.major, now));
       map.setLayoutProperty(layer.id, "visibility", showRisk ? "visible" : "none");
     }
-  }, [ready, rain, tide, overridesKey, showRisk]);
+  }, [ready, rain, tideKey, overridesKey, showRisk]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -196,7 +196,7 @@ class Context:
             rain = local.rain_state.copy()
             rain[radar["watch"]] = np.maximum(rain[radar["watch"]], 1)
             rain[radar["alert"]] = 2
-            level = ports.model_route_levels(model.bands_rain, model.bands_tide, rain, local.tide_state)
+            level = live_local.levels_of(model, rain, local.tide_extent)
         reported = live_reports.by_route(live_reports.active(settings.db_path(), city))
         level, confirmed = live_reports.apply(level, reported)
         return level, confirmed, reported

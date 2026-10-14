@@ -8,7 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from floodrisk import config
-from floodrisk.model.levels import live_bands
+from floodrisk.model.levels import live_bands, rank_order
 
 TZ = "Asia/Ho_Chi_Minh"
 RAIN = {"selected_features": ["rain_max_3h_mm", "rain_total_mm"],
@@ -40,7 +40,7 @@ def model_data(data):
     table = pd.DataFrame({
         "route_id": [f"r{i:03d}" for i in range(N_ROUTES)], "name": [f"Đường {i}" for i in range(N_ROUTES)],
         "highway_class": "residential", "length_m": 100.0, "in_universe": True,
-        "band_rain": live_bands(score), "band_tide": live_bands(score[::-1].copy()),
+        "band_rain": live_bands(score), "band_tide": live_bands(score[::-1].copy()), "tide_order": rank_order(score[::-1].copy()),
         "history_rain": False, "history_tide": False, "history_dates_rain": 0, "history_dates_tide": 0,
     })
     table.to_parquet(config.route_table_path("hcm"), index=False)
@@ -49,7 +49,7 @@ def model_data(data):
 
     layer = {"type": "FeatureCollection", "features": [
         {"type": "Feature", "id": 0, "geometry": {"type": "LineString", "coordinates": [[106.7, 10.78], [106.701, 10.78]]},
-         "properties": {"id": "r000", "name": "Đường 0", "cls": "residential", "len": 100, "br": 2, "bt": 0, "hr": 0, "ht": 0}}]}
+         "properties": {"id": "r000", "name": "Đường 0", "cls": "residential", "len": 100, "br": 2, "bt": 0, "pt": 99, "hr": 0, "ht": 0}}]}
     config.risk_layer_path("hcm").write_bytes(gzip.compress(json.dumps(layer).encode("utf-8")))
     config.flood_points_path("hcm").write_text(
         "no,cause,place,n_routes,located_by,lon,lat,route_ids\n"
@@ -200,3 +200,15 @@ def test_local_sources_are_reapplied_when_a_new_model_result_arrives(model_data,
     client.post("/api/risk/snapshot", json={"city": "hcm", "record": record}, headers={"X-Push-Token": "ma-thu"})
     body = client.get("/api/risk").json()
     assert body["states"]["rain"] == "alert" and body["counts_now"] == {"high": 5, "medium": 15} and body["overrides"] == {}
+
+
+def test_risk_sends_the_tide_extent_and_forecast_from_phu_an(model_data):
+    from types import SimpleNamespace
+
+    client, ctx = _client(_rain(0.0))
+    ctx.hydro_sources["hcm"] = SimpleNamespace(rain_gauges=lambda: [], gauge_hours=lambda g: [], tide_point=lambda t: (1.65, "measured"))
+    body = client.get("/api/risk").json()
+    # 1,65 m: 5% đầu bảng triều đỏ, tới 10% có màu (100 tuyến: 5 đỏ, 5 vàng); web tự tô theo `pt`, nên không có tuyến nào phải ghi đè
+    assert body["tide_extent"] == {"red": 5, "coloured": 10} and body["overrides"] == {}
+    assert body["counts_now"] == {"high": 5, "medium": 5} and body["states"]["tide"] == "alert"
+    assert len(body["tide_forecast"]) == 12 and body["tide_forecast"][0]["level_m"] == 1.65

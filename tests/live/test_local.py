@@ -20,7 +20,8 @@ def _model():
     # ba tuyến nhóm A theo mưa: hai tuyến sát trạm (cách vài trăm mét), một tuyến cách trạm khoảng 11 km
     routes = pd.DataFrame({"lat": [10.80, 10.801, 10.90], "lon": [106.70, 106.70, 106.70]})
     return SimpleNamespace(routes=routes, references={"ifs": REFERENCE}, rain_cfg=CFG, rain_limits=(0.5093524878214044, 0.5395158283435458),
-                           bands_rain=np.array([2, 2, 2], np.uint8), bands_tide=np.array([0, 2, 0], np.uint8))
+                           bands_rain=np.array([2, 2, 2], np.uint8), bands_tide=np.array([0, 2, 0], np.uint8),
+                           tide_order=np.array([1, 0, 2], np.int32))  # tuyến 1 đứng đầu bảng triều
 
 
 def _hour(rain=levels.QUIET, tide=levels.QUIET):
@@ -111,3 +112,24 @@ def test_flood_cost_slows_history_routes_most_and_reports_exposure():
     assert (seen["high_m"], seen["medium_m"], seen["history_m"]) == (100, 500, 300)
     assert seen["segments"][0] == {"name": "C", "level": 1, "basis": "history", "length_m": 300}
     assert {s["name"] for s in seen["segments"]} == {"A", "C", "Đường chưa có tên"}
+
+
+def test_higher_tide_colours_more_of_the_tide_ranking():
+    assert [local.tide_extent_of(m) for m in (1.39, 1.40, 1.50, 1.60, 1.70)] == [
+        (0.0, 0.0), (0.0, .02), (.02, .05), (.05, .10), (.05, .20)]
+    order = np.arange(100, dtype=np.int32)  # tuyến i đứng thứ i
+    by_level = {m: levels.extent_levels(order, local.tide_extent_of(m)) for m in (1.45, 1.55, 1.65, 1.75)}
+    assert [(int((v == 2).sum()), int((v == 1).sum())) for v in by_level.values()] == [(0, 2), (2, 3), (5, 5), (5, 15)]
+
+
+def test_phu_an_replaces_the_model_tide_state_and_gives_a_forecast():
+    # mô hình (triều thiên văn Vũng Tàu) báo động, nhưng Phú An mới 0,9 m: không tuyến nào lên mức do triều
+    found = local.read(_model(), _hour(tide=levels.ALERT), _source(0.0, 0.9), NOW)
+    assert found.tide_state == levels.QUIET and list(local.route_levels(_model(), found)) == [0, 0, 0]
+    assert len(found.tide_forecast) == local.FORECAST_HOURS and found.tide_forecast[0]["time"] == "2026-10-08T15:00:00+07:00"
+    # không đọc được Phú An thì theo mô hình như cũ: báo động là nhóm A cao
+    def broken(t):
+        raise RuntimeError("cổng lỗi")
+    source = SimpleNamespace(rain_gauges=lambda: [], gauge_hours=lambda g: [], tide_point=broken)
+    found = local.read(_model(), _hour(tide=levels.ALERT), source, NOW)
+    assert list(local.route_levels(_model(), found)) == [0, 2, 0] and found.tide_forecast == []

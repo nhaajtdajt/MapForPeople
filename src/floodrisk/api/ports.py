@@ -19,6 +19,8 @@ from floodrisk.model.live import CityModel, Snapshot, current_hour, from_record,
 from floodrisk.model.levels import LEVEL_NAMES, STATE_NAMES  # noqa: F401
 from floodrisk.model.levels import route_levels as model_route_levels  # noqa: F401
 from floodrisk.live.local import route_levels as local_route_levels  # noqa: F401
+from floodrisk.live.local import MODEL_TIDE_EXTENT, levels_of  # noqa: F401
+from floodrisk.model.levels import extent_counts  # noqa: F401
 
 log = logging.getLogger(__name__)
 

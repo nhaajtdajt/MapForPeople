@@ -89,6 +89,10 @@ export interface RiskState {
   wet_gauges: number | null;
   /** Radar: giờ của ảnh cuối và mã các tuyến radar đang thấy mưa lớn. null khi chưa có số liệu radar còn mới. */
   radar: { at: string; image_time: string; images: number; watch: number[]; alert: number[] } | null;
+  /** Phần tô theo triều: tuyến có `pt` dưới `red` là cao, dưới `coloured` là vừa (máy chủ chọn theo mực nước Phú An). */
+  tide_extent?: { red: number; coloured: number };
+  /** Mực nước Phú An dự báo cho 12 giờ tới. */
+  tide_forecast?: { time: string; level_m: number; state: DayState }[];
   /** Mức riêng của những tuyến lệch khỏi `states`, khóa là `id` của tuyến trong lớp bản đồ. */
   overrides: Record<string, number>;
   counts_now: { high: number; medium: number };

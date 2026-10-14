@@ -32,7 +32,7 @@ import numpy as np
 import pandas as pd
 
 from floodrisk import config
-from floodrisk.model.levels import live_bands
+from floodrisk.model.levels import live_bands, rank_order
 
 ROOT = Path(__file__).resolve().parents[1]
 MODEL_REPO = ROOT.parent / "flood_prediction_models"
@@ -97,6 +97,7 @@ def build(city: str, routes_file: Path) -> None:
         "route_id": scores.route_id.to_numpy(), "name": routes.name.to_numpy(), "highway_class": routes.highway_class.to_numpy(),
         "length_m": routes.length_m.to_numpy(float).round(1), "in_universe": scores.in_universe.to_numpy() == 1,
         "band_rain": live_bands(scores.S_hyb_rain.to_numpy()), "band_tide": live_bands(scores.S_hyb_tide.to_numpy()),
+        "tide_order": rank_order(scores.S_hyb_tide.to_numpy()),
         "history_rain": scores.H_rain.to_numpy() > 0, "history_tide": scores.H_tide.to_numpy() > 0,
         "history_dates_rain": scores.n_distinct_dates_rain.to_numpy().astype("int32"),
         "history_dates_tide": scores.n_distinct_dates_tide.to_numpy().astype("int32"),
@@ -119,7 +120,7 @@ def build(city: str, routes_file: Path) -> None:
         features.append({"type": "Feature", "id": int(row), "geometry": shape, "properties": {
             "id": r.route_id, "name": r["name"] if isinstance(r["name"], str) else "", "cls": r.highway_class,
             "len": int(round(r.length_m)),
-            "br": int(r.band_rain), "bt": int(r.band_tide),
+            "br": int(r.band_rain), "bt": int(r.band_tide), "pt": int(r.tide_order),
             "hr": int(r.history_dates_rain) if r.history_rain else 0, "ht": int(r.history_dates_tide) if r.history_tide else 0}})
     text = json.dumps({"type": "FeatureCollection", "features": features}, ensure_ascii=False, separators=(",", ":"))
     with open(config.risk_layer_path(city), "wb") as raw, gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as packed:

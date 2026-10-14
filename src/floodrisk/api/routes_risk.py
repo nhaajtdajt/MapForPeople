@@ -103,7 +103,8 @@ def register(app: FastAPI, ctx: Context) -> None:
             "ok": True,
             "test_tools": settings.test_tools_enabled(),
             "data": data_kind(),
-            "parts": ports.status(),
+            # Hai phần "evidence" và "scenarios" chỉ dùng cho dữ liệu mẫu; dữ liệu thật dùng báo cáo thật (live/reports.py).
+            "parts": ports.status() if data_kind() == "sample" else {"risk": "real", "reports": "real"},
             "traffic": ctx.traffic_status(),
             "last_refresh": ctx.last_refresh,
             "last_error": ctx.last_error,
@@ -142,7 +143,9 @@ def register(app: FastAPI, ctx: Context) -> None:
         now = snapshot.hours[0]
         tide_state = local.tide_state if local is not None else now.tide.state
         rain_state = 0 if local is not None and not local.errors else now.rain.state
-        base = ports.model_route_levels(model.bands_rain, model.bands_tide, rain_state, tide_state)
+        tide_extent = local.tide_extent if local is not None else ports.MODEL_TIDE_EXTENT[now.tide.state]
+        base = ports.levels_of(model, rain_state, tide_extent)
+        red_n, coloured_n = ports.extent_counts(len(model.tide_order), tide_extent)
         changed = (level != base).nonzero()[0]
         return {
             "city": city,
@@ -157,6 +160,10 @@ def register(app: FastAPI, ctx: Context) -> None:
                        "counts": model.counts(hour)} for hour in snapshot.hours],
             "local": _local(model, snapshot.hours[0], local) if local is not None else None,
             "states": {"rain": ports.STATE_NAMES[rain_state], "tide": ports.STATE_NAMES[tide_state]},
+            # Triều tô theo thứ hạng: tuyến có `pt` (vị trí trong bảng xếp hạng triều, lớp bản đồ) dưới `red` là cao, dưới `coloured` là vừa.
+            "tide_extent": {"red": red_n, "coloured": coloured_n},
+            # Mực nước Phú An dự báo cho 12 giờ tới (rỗng khi không có số Phú An).
+            "tide_forecast": local.tide_forecast if local is not None else [],
             # Dự báo chung của Mô hình 2 cho cả thành phố: chỉ để thông báo, không dùng để tô màu khi đã có số đo tại chỗ.
             "model_rain": ports.STATE_NAMES[now.rain.state],
             "wet_gauges": sum(1 for g in local.gauges if g["state"] > 0) if local is not None else None,
