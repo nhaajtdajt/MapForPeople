@@ -60,3 +60,18 @@ def test_gauges_use_millimetre_thresholds():
     assert local.gauge_state_of(30.0, 30.0) == levels.WATCH and local.gauge_state_of(0.0, 50.0) == levels.WATCH
     assert local.gauge_state_of(36.0, 36.0) == levels.ALERT  # trưa 06/10: trạm Cô Bắc 36 mm/giờ, Lê Lợi, Bùi Viện ngập
     assert local.gauge_state_of(5.0, 80.0) == levels.ALERT and local.gauge_state_of(34.9, 79.0) == levels.WATCH
+
+
+def test_radar_keeps_the_colour_for_half_an_hour_after_the_rain_passes():
+    from datetime import datetime, timedelta, timezone
+
+    start = datetime(2026, 10, 15, 6, 0, tzinfo=timezone.utc)
+    wet, dry = np.full((40, 40), 8, np.uint8), np.zeros((40, 40), np.uint8)
+    frames = [(start + timedelta(minutes=10 * k), wet if k < 6 else dry) for k in range(16)]  # mưa 06:00-06:50, rồi tạnh
+    raining = radar.held_rate(frames[:6], start + timedelta(minutes=50))
+    held = radar.held_rate(frames[:10], start + timedelta(minutes=90))  # 40 phút sau ảnh mưa cuối
+    gone = radar.held_rate(frames, start + timedelta(minutes=150))
+    assert raining[20, 20] > radar.WATCH_MM_H  # bậc 8: khoảng 24 mm/giờ trên thang radar
+    assert held[20, 20] > radar.WATCH_MM_H  # khung giờ kết thúc 30 phút trước vẫn còn mưa
+    assert gone[20, 20] == 0.0
+    assert radar.held_rate(frames[:2], start + timedelta(minutes=10)) is None  # chưa đủ ảnh

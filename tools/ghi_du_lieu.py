@@ -187,11 +187,11 @@ def radar_step(now: datetime) -> str:
 
     utc = now.astimezone(timezone.utc)
     folders = [LIVE / f"{(now - timedelta(days=d)):%Y-%m-%d}" / "radar" for d in (0, 1)]
-    images = radar.last_hour(folders, utc)
-    if len(images) < radar.MIN_IMAGES:
+    images = radar.last_hour(folders, utc, 65 + radar.HOLD_MINUTES)
+    if len(radar.last_hour(folders, utc)) < radar.MIN_IMAGES:
         return f"radar chỉ có {len(images)} ảnh trong giờ qua"
     background = radar.dry_background()
-    rate = radar.hourly_rate([radar.levels(p) for p in images], background)
+    rate = radar.held_rate([(radar.image_time(p), radar.levels(p)) for p in images], utc, background)
     routes = pd.read_parquet(fr_config.route_table_path("hcm"), columns=["lat", "lon", "band_rain"])
     state = radar.states_at(routes.lat.to_numpy(), routes.lon.to_numpy(), rate)
     state[routes.band_rain.to_numpy() == 0] = 0  # tuyến mô hình không xếp là dễ ngập do mưa thì không bao giờ có mức do mưa

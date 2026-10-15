@@ -34,6 +34,7 @@ WATCH_MM_H = 20.0  # ngưỡng trạm đo (local.GAUGE_WATCH[0] = 30 mm/giờ) c
 ALERT_MM_H = 35.0  # local.GAUGE_ALERT[0] = 50 mm/giờ chia 1,4; trước là 20 (và 12 cho tới tối 08/10)
 MIN_IMAGES = 4  # cần ít nhất chừng này ảnh trong giờ qua
 NEAR_SITE_KM = 5.0  # sát trạm radar toàn nhiễu mặt đất
+HOLD_MINUTES = 30  # giữ trạng thái radar thêm chừng này sau khi mưa đi qua: nước còn đọng (An Lạc chiều 15/10 tắt màu lúc 14:40 dù đường còn ngập)
 BACKGROUND_STEP = 0.25  # file nền khô lưu uint8 theo bước này (mm/giờ), tối đa 63,75
 URL = "http://hymetnet.gov.vn/dataout_web/NHB/{d:%Y%m%d}/NHB_{d:%Y%m%d%H%M}_CMAX00.png"
 PALETTE = [(102, 212, 251), (2, 109, 248), (7, 69, 248), (167, 250, 132), (87, 250, 35), (5, 224, 51),
@@ -68,11 +69,25 @@ def levels(path: Path) -> np.ndarray:
         return out
 
 
-def last_hour(folders: list[Path], now: datetime) -> list[Path]:
-    """Các ảnh radar của 65 phút vừa qua trong những thư mục đã cho, cũ trước mới sau."""
+def last_hour(folders: list[Path], now: datetime, minutes: int = 65) -> list[Path]:
+    """Các ảnh radar của `minutes` phút vừa qua trong những thư mục đã cho, cũ trước mới sau."""
     found = [p for folder in folders if folder.exists() for p in folder.glob("NHB_*.png")]
-    recent = [p for p in found if timedelta(0) <= now - image_time(p) <= timedelta(minutes=65)]
+    recent = [p for p in found if timedelta(0) <= now - image_time(p) <= timedelta(minutes=minutes)]
     return sorted(recent, key=image_time)
+
+
+def held_rate(frames: list[tuple[datetime, np.ndarray]], now: datetime, background: np.ndarray | None = None) -> np.ndarray | None:
+    """Mưa theo radar có giữ màu: lớn hơn giữa cường độ của giờ vừa qua và của giờ kết thúc HOLD_MINUTES trước.
+
+    `frames` là (giờ ảnh, bậc mưa) của các ảnh trong 65 + HOLD_MINUTES phút qua. None khi không khung nào đủ MIN_IMAGES ảnh.
+    """
+    held = None
+    for end in (now, now - timedelta(minutes=HOLD_MINUTES)):
+        grids = [grid for at, grid in frames if timedelta(0) <= end - at <= timedelta(minutes=65)]
+        if len(grids) >= MIN_IMAGES:
+            rate = hourly_rate(grids, background)
+            held = rate if held is None else np.maximum(held, rate)
+    return held
 
 
 def background_path() -> Path:
