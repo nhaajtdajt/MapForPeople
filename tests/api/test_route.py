@@ -90,3 +90,8 @@ def test_loading_a_corrupt_network_is_reported(data):
     nodes.to_parquet(config.graph_nodes_path("hcm"))
     with pytest.raises(GraphError, match="nút"):
         RoadGraph.load("hcm")
+
+
+def test_replay_of_an_unknown_flood_event_is_404(client):
+    response = client.get("/api/route", params={"city": "hcm", "origin": "10.776,106.700", "destination": "10.780,106.705", "vehicle": "bike", "event": "khong-co"})
+    assert response.status_code == 404 and "trận" in response.json()["detail"]

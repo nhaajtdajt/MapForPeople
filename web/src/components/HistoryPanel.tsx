@@ -54,11 +54,12 @@ interface Props {
   error: string | null;
   selected: HistoryEvent | null;
   onSelect: (id: string | null) => void;
+  onRoute: () => void;
   onClose: () => void;
 }
 
 /** Xem lại các trận ngập: chọn một trận, bản đồ tô lại đúng như app đã tô lúc đó, kèm chỗ ngập thật đúng hay sót. */
-export default function HistoryPanel({ history, error, selected, onSelect, onClose }: Props) {
+export default function HistoryPanel({ history, error, selected, onSelect, onRoute, onClose }: Props) {
   const [details, setDetails] = useState(false);
 
   return (
@@ -157,7 +158,15 @@ export default function HistoryPanel({ history, error, selected, onSelect, onClo
                 )}
               </div>
             )}
-            <p className="mt-1 text-xs text-ink-faint">Chạm vào từng chấm trên bản đồ để xem vì sao app báo như vậy.</p>
+            <button
+              type="button"
+              onClick={onRoute}
+              className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white transition-colors hover:bg-brand-strong"
+            >
+              <Icon name="route" className="h-[18px] w-[18px]" />
+              Tìm đường trong trận này
+            </button>
+            <p className="mt-2 text-xs text-ink-faint">Chạm vào từng chấm trên bản đồ để xem vì sao app báo như vậy.</p>
           </div>
         )}
       </section>

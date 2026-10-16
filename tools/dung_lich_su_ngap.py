@@ -93,12 +93,17 @@ def rain_basis(row: int, level: int, stations, gauge_state, radar_state, radar_v
     trig = [st for st in stations if st["state"] and d[st["name"]] * 1000 <= local.RADIUS_M]
     if trig:
         st = max(trig, key=lambda s: (s["state"], s["mm1"]))
-        lines.append(f"Trạm {st['name']} cách {d[st['name']]:.1f} km đo {st['mm1']:g} mm trong một giờ"
+        if st.get("total"):
+            lines.append(f"Trạm {st['name']}{' (vị trí ước lượng theo tên)' if st.get('approx') else ''} cách {d[st['name']]:.1f} km: báo chí đưa tổng {st['mm3']:g} mm cả trận, "
+                         f"xét như mưa 3 giờ: {'báo động (từ 80 mm trong 3 giờ)' if st['state'] == 2 else 'cảnh giác (từ 50 mm trong 3 giờ)'}; "
+                         f"đủ mức trong {local.FULL_RADIUS_M / 1000:g} km, tối đa vàng tới {local.RADIUS_M / 1000:g} km.")
+        else:
+            lines.append(f"Trạm {st['name']} cách {d[st['name']]:.1f} km đo {st['mm1']:g} mm trong một giờ"
                      + (f" ({st['mm3']:g} mm trong 3 giờ)" if st["mm3"] > st["mm1"] else "") + ": "
-                     f"{'báo động (từ 35 mm/giờ)' if st['state'] == 2 else 'cảnh giác (từ 30 mm/giờ)'}; trạm áp đủ mức cho đường trong {local.FULL_RADIUS_M / 1000:g} km, tối đa vàng tới {local.RADIUS_M / 1000:g} km.")
+                         f"{'báo động (từ 35 mm/giờ)' if st['state'] == 2 else 'cảnh giác (từ 30 mm/giờ)'}; trạm áp đủ mức cho đường trong {local.FULL_RADIUS_M / 1000:g} km, tối đa vàng tới {local.RADIUS_M / 1000:g} km.")
     elif nearest is not None:
-        lines.append(f"Trạm đo gần nhất ({nearest['name']}, cách {d[nearest['name']]:.1f} km) chỉ đo {nearest['mm1']:g} mm trong một giờ: "
-                     f"{'dưới ngưỡng cảnh giác 30 mm/giờ' if nearest['mm1'] < 30 else f'nhưng ở xa hơn {local.RADIUS_M / 1000:g} km'}.")
+        lines.append(f"Trạm đo có số gần nhất ({nearest['name']}, cách {d[nearest['name']]:.1f} km) chỉ đo {max(nearest['mm1'], nearest['mm3']):g} mm: "
+                     f"{'dưới ngưỡng cảnh giác' if not nearest.get('state') else f'nhưng ở xa hơn {local.RADIUS_M / 1000:g} km'}.")
     if has_radar:
         v = float(radar_value[row])
         if radar_state[row]:
@@ -118,7 +123,7 @@ def rain_event(eid, title, when, stations, rate, truth, sources, note, kind="flo
     level = levels.cause_levels(BAND_RAIN, state)
     return finish(eid, "rain", title, when, level, truth, sources, note,
                   # chỉ nêu trạm có đường nằm trong bán kính của nó (bỏ trạm ở Long An, Bà Rịa không tô đường nào trong thành phố)
-                  basis=[f"Trạm {s['name']}: {s['mm1']:g} mm/giờ ({'báo động' if s['state'] == 2 else 'cảnh giác'})" for s in stations
+                  basis=[f"Trạm {s['name']}: " + (f"tổng {s['mm3']:g} mm cả trận" if s.get("total") else f"{s['mm1']:g} mm/giờ") + f" ({'báo động' if s['state'] == 2 else 'cảnh giác'})" for s in stations
                          if s["state"] and (level[km(LAT, LON, s["lat"], s["lon"]) * 1000 <= local.RADIUS_M] > 0).any()]
                   + ([f"Radar: {int((radar_state == 1).sum())} đoạn cảnh giác, {int((radar_state == 2).sum())} đoạn báo động"] if rate is not None else []),
                   why=lambda row: rain_basis(row, int(level[row]), stations, gauge_state, radar_state, radar_value, rate is not None),
@@ -189,6 +194,23 @@ def stations_from_max(values: dict[str, float]):
     for name, mm in values.items():
         g = GAUGES[name]
         out.append({"name": name, "lat": g["lat"], "lon": g["lon"], "mm1": mm, "mm3": mm})
+    return out
+
+
+# Vị trí ước lượng theo tên cho các trạm báo chí nêu mà không có trong 44 trạm của cổng vndms.
+APPROX = {"Thảo Điền": (10.8040, 106.7350), "Thanh Đa": (10.8170, 106.7200), "Dương Quảng Hàm": (10.8350, 106.6880),
+          "Bình Hưng Hòa": (10.8020, 106.6020)}
+
+
+def stations_from_totals(values: dict[str, float]):
+    """Tổng mưa cả trận báo chí đưa (mưa dồn trong khoảng 3 giờ): xét như mưa 3 giờ, không có số của từng giờ."""
+    out = []
+    for name, total in values.items():
+        if name in GAUGES:
+            lat, lon, approx = GAUGES[name]["lat"], GAUGES[name]["lon"], False
+        else:
+            (lat, lon), approx = APPROX[name], True
+        out.append({"name": name, "lat": lat, "lon": lon, "mm1": 0.0, "mm3": total, "total": True, "approx": approx})
     return out
 
 
@@ -283,6 +305,48 @@ def main() -> None:
         [{"label": "Tuổi Trẻ: Nhiều tuyến đường ở TP.HCM ngập vì triều cường đạt đỉnh", "url": "https://tuoitre.vn/nhieu-tuyen-duong-o-tphcm-ngap-vi-trieu-cuong-dat-dinh-100261011145716767.htm"},
          {"label": "Dân trí: Triều cường dâng cao, đường phố TPHCM ngập gần nửa mét", "url": "https://dantri.com.vn/dt360/trieu-cuong-dang-cao-duong-pho-tphcm-ngap-gan-nua-met-20261010190600412.htm"}],
         "Phú An 1,72 m lúc 17:00, số đo thật. Các bậc tô theo mực nước được đặt trước khi chấm, nhưng đã chấm trên đợt triều này."))
+    events.append(tide_event(
+        "trieu-2026-10-13", "Triều cường chiều tối 13/10", "13/10/2026, 18:00", 1.62,
+        truth_streets([("Trần Xuân Soạn", (10.74, 10.76, 106.69, 106.73)), ("15B", (10.70, 10.78, 106.68, 106.76))],
+                      "Báo chí: triều dâng, Trần Xuân Soạn ngập nặng nhất; ngập cục bộ đường 15B (Tân Mỹ)"),
+        [{"label": "Tuổi Trẻ: tin triều cường 11-13/10", "url": "https://tuoitre.vn/trieu-cuong-tphcm.html"}],
+        "Phú An 1,62 m lúc 18:00, số đo thật."))
+    events.append(tide_event(
+        "trieu-2026-10-10", "Triều cường chiều tối 10/10", "10/10/2026, 16:00", 1.66,
+        truth_streets([("Phạm Hữu Lầu", (10.68, 10.74, 106.70, 106.75)), ("Trần Xuân Soạn", (10.74, 10.76, 106.69, 106.73)),
+                       ("Nguyễn Bình", (10.62, 10.70, 106.70, 106.80))], "Báo chí: ngập sâu tối 10/10 (Phạm Hữu Lầu nửa mét, Hiệp Phước)"),
+        [{"label": "Dân trí: Triều cường dâng cao, đường phố TPHCM ngập gần nửa mét", "url": "https://dantri.com.vn/dt360/trieu-cuong-dang-cao-duong-pho-tphcm-ngap-gan-nua-met-20261010190600412.htm"}],
+        "Phú An 1,66 m lúc 16:00, số đo thật."))
+    events.append(rain_event(
+        "mua-2026-09-30", "Mưa lớn chiều tối 30/9", "30/09/2026, chiều tối",
+        stations_from_totals({"Hà Huy Giáp": 79.2}), None,
+        truth_streets([("Hồ Học Lãm", (10.71, 10.75, 106.59, 106.63)), ("Tên Lửa", (10.74, 10.77, 106.60, 106.62)), ("Phan Anh", (10.76, 10.79, 106.61, 106.63)),
+                       ("Quang Trung", (10.83, 10.86, 106.63, 106.68)), ("Phạm Văn Chiêu", (10.84, 10.86, 106.64, 106.67)),
+                       ("Nguyễn Văn Khối", (10.83, 10.86, 106.65, 106.69)), ("Lê Đức Thọ", (10.83, 10.87, 106.66, 106.69)),
+                       ("Bà Triệu", (10.87, 10.91, 106.58, 106.61)), ("Phan Huy Ích", (10.81, 10.84, 106.62, 106.65)),
+                       ("Phan Văn Hớn", (10.82, 10.86, 106.58, 106.63)), ("Nguyễn Văn Quá", (10.83, 10.87, 106.62, 106.64))],
+                      "Báo chí: 12 tuyến ngập sau mưa chiều tối 30/9 (Phan Huy Ích ngập gần 1 m)"),
+        [{"label": "CafeF: 12 tuyến đường ở TPHCM ngập sau mưa lớn, có nơi ngập hơn 1 mét", "url": "https://cafef.vn/12-tuyen-duong-o-tphcm-ngap-sau-mua-lon-co-noi-ngap-hon-1-met-188261001174131262.chn"}],
+        "Báo chỉ nêu một con số mưa: trạm Hà Huy Giáp tổng 79,2 mm. Các trạm khác không có số, nên app được chấm với rất ít dữ liệu; không có ảnh radar."))
+    events.append(rain_event(
+        "mua-2026-09-22", "Mưa lớn chiều tối 22/9", "22/09/2026, chiều tối",
+        stations_from_totals({"Dĩ An 1": 71.8, "Nhà Bè": 64.8, "Thủ Đức": 58.4, "Hóc Môn": 54.6, "Bình Chánh": 52.4}), None,
+        truth_streets([("Quốc Hương", (10.79, 10.82, 106.72, 106.75)), ("Xuân Thủy", (10.79, 10.82, 106.72, 106.75)), ("R12", (10.77, 10.79, 106.70, 106.72)),
+                       ("D5", (10.79, 10.81, 106.70, 106.72)), ("Nguyễn Văn Khối", (10.83, 10.86, 106.65, 106.69)), ("Bạch Đằng", (10.80, 10.81, 106.69, 106.71))],
+                      "Báo chí: ngập nặng chiều tối 22/9"),
+        [{"label": "Tuổi Trẻ: Mưa lớn giờ cao điểm tại TP.HCM, nhiều tuyến đường ngập sâu", "url": "https://tuoitre.vn/mua-lon-gio-cao-diem-tai-tphcm-nhieu-tuyen-duong-ngap-sau-giao-thong-cau-vuot-hang-xanh-un-u-100260922185755797.htm"}],
+        "Tổng mưa tới 18:30 của các trạm báo chí nêu, xét như mưa 3 giờ. Không có số trạm nào ở Bình Thạnh, Thảo Điền nơi ngập nặng nhất; không có ảnh radar."))
+    events.append(rain_event(
+        "mua-2026-09-10", "Mưa lớn nhất từ đầu năm, 10/9", "10/09/2026, 17–20h",
+        stations_from_totals({"Thảo Điền": 153.0, "Dương Văn Cam": 140.0, "Thanh Đa": 137.0, "Dương Quảng Hàm": 137.0, "Nguyễn Thị Sẳng": 129.0, "Bình Hưng Hòa": 120.0}), None,
+        truth_streets([("Tô Ngọc Vân", (10.84, 10.88, 106.73, 106.77)), ("Nguyễn Duy Trinh", (10.78, 10.83, 106.76, 106.81)),
+                       ("Quốc Hương", (10.79, 10.82, 106.72, 106.75)), ("Dương Văn Cam", (10.84, 10.86, 106.74, 106.76)), ("Hồ Văn Tư", (10.84, 10.86, 106.75, 106.77))],
+                      "Báo chí: 33 tuyến ngập (bài nêu tên một phần), Tô Ngọc Vân, Nguyễn Duy Trinh sâu 40-45 cm"),
+        [{"label": "VnExpress: 33 đường TP HCM ngập sau trận mưa lớn nhất từ đầu năm", "url": "https://vnexpress.net/33-duong-tp-hcm-ngap-sau-tran-mua-lon-nhat-tu-dau-nam-5119511.html"}],
+        "Tổng mưa cả trận (mạnh nhất 17–20h) báo chí nêu, xét như mưa 3 giờ. Bốn trạm (Thảo Điền, Thanh Đa, Dương Quảng Hàm, Bình Hưng Hòa) không có trong danh sách trạm của cổng nên vị trí là ước lượng theo tên. Trận này chưa dùng để chọn ngưỡng."))
+    order = ["mua-2026-10-15", "trieu-2026-10-13", "trieu-2026-10-11", "trieu-2026-10-10", "mua-2026-10-08", "mua-2026-10-07",
+             "mua-2026-10-06", "mua-2026-10-01", "mua-2026-09-30", "mua-2026-09-22", "mua-2026-09-10"]
+    events.sort(key=lambda e: order.index(e["id"]))
     out = config.processed_dir("hcm") / "lich_su_ngap.json"
     out.write_text(json.dumps({"city": "hcm", "built": datetime.now(VN).isoformat(timespec="minutes"), "events": events},
                               ensure_ascii=False, separators=(",", ":")), encoding="utf-8")

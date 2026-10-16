@@ -234,15 +234,43 @@ class Context:
         rows = live_local.routes_within(model.routes, lat, lon, max_m)
         return [(int(r), str(model.routes.route_id.iloc[int(r)])) for r in rows]
 
-    def flood_view(self, city: str):
-        """Mức ngập trên từng cạnh của mạng đường, cho tìm đường tránh ngập. None khi thành phố chưa có đủ dữ liệu."""
-        state = self.route_state(city)
-        if state is None:
+    def history_level(self, city: str, event_id: str):
+        """Mức từng tuyến như app đã tô trong một trận đã qua (tools/dung_lich_su_ngap.py). None khi không có trận đó."""
+        path = config.history_path(city)
+        if not path.exists():
             return None
+        key = (city, path.stat().st_mtime_ns)
+        if getattr(self, "_history_key", None) != key:
+            self._history = json.loads(path.read_text(encoding="utf-8"))
+            self._history_key = key
+        event = next((e for e in self._history["events"] if e["id"] == event_id), None)
+        if event is None:
+            return None
+        model = self.model(city)
+        level = np.zeros(len(model.routes), np.uint8)
+        if event.get("tide_extent"):
+            red, coloured = event["tide_extent"]["red"], event["tide_extent"]["coloured"]
+            order = model.tide_order
+            level = np.where(order < red, 2, np.where(order < coloured, 1, 0)).astype(np.uint8)
+        for row, value in event.get("predicted", []):
+            level[int(row)] = max(level[int(row)], int(value))
+        return level, event["title"]
+
+    def flood_view(self, city: str, level=None):
+        """Mức ngập trên từng cạnh của mạng đường, cho tìm đường tránh ngập. None khi thành phố chưa có đủ dữ liệu.
+
+        `level` cho trước (mức của một trận đã qua) thì dùng nó thay cho mức lúc này, không có báo cáo xác nhận.
+        """
+        if level is None:
+            state = self.route_state(city)  # None khi thành phố chưa có mô hình: phải hỏi trước khi đọc bảng tuyến
+            if state is None:
+                return None
+            level, confirmed, _ = state
+        else:
+            confirmed = np.zeros(len(level), bool)
         edge_route = self.edge_route(city)
         if edge_route is None:
             return None
-        level, confirmed, _ = state
         routes = self.model(city).routes
         history = (routes.history_rain | routes.history_tide).to_numpy(bool)
         return floodcost.FloodView(edge_route, np.asarray(level), history, routes["name"].fillna("").to_numpy(object), confirmed)

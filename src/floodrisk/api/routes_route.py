@@ -82,11 +82,17 @@ def register(app: FastAPI, ctx: Context) -> None:
         }
 
     @app.get("/api/route")
-    def find_route(city: str, origin: str, destination: str, vehicle: str = "bike"):
+    def find_route(city: str, origin: str, destination: str, vehicle: str = "bike", event: str | None = None):
         if city not in config.CITIES:
             raise HTTPException(404, f"Thành phố không có trong hệ thống: {city}")
         if vehicle not in VEHICLES:
             raise HTTPException(422, "Loại xe phải là bike (xe máy) hoặc car (ô tô)")
+        replay = None
+        if event:
+            # Tái hiện: tìm đường theo bản đồ ngập của một trận đã qua (chế độ "Xem lại các trận ngập").
+            replay = ctx.history_level(city, event)
+            if replay is None:
+                raise HTTPException(404, "Không có trận ngập này trong dữ liệu xem lại")
         o_lat, o_lon = parse_point(origin, "Điểm đi")
         d_lat, d_lon = parse_point(destination, "Điểm đến")
         west, south, east, north = config.CITIES[city].bbox
@@ -115,8 +121,10 @@ def register(app: FastAPI, ctx: Context) -> None:
             raise HTTPException(404, "Không tìm được đường giữa hai điểm này")
 
         now = datetime.now(VN)
-        flood = ctx.flood_view(city)
-        notes = [ESTIMATE_NOTE] + ([FLOOD_NOTE] if flood is not None else [])
+        flood = ctx.flood_view(city, replay[0] if replay else None)
+        notes = [ESTIMATE_NOTE] + ([FLOOD_NOTE] if flood is not None and not replay else [])
+        if replay:
+            notes.insert(0, f"Đang tái hiện: lộ trình tính theo bản đồ ngập của trận \"{replay[1]}\". Thời gian đi là thời gian lúc này, không phải của ngày đó.")
         for label, key in (("Điểm đi", "origin"), ("Điểm đến", "destination")):
             if snapped[key]["distance_m"] > 50:
                 notes.append(f"{label} được gắn vào đường gần nhất, cách {snapped[key]['distance_m']:.0f} m.")

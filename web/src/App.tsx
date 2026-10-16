@@ -65,13 +65,14 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
-  const directions = useDirections();
   const [historyOpen, setHistoryOpen] = useState(false);
   const [history, setHistory] = useState<FloodHistory | null>(null);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [historyId, setHistoryId] = useState<string | null>(null);
   const [historyPlace, setHistoryPlace] = useState<HistoryPlace | null>(null);
   const historyEvent = history?.events.find((event) => event.id === historyId) ?? null;
+  // Đang xem lại một trận thì chỉ đường theo bản đồ ngập của trận đó.
+  const directions = useDirections(historyOpen && historyEvent ? historyEvent.id : null);
 
   const cityRef = useRef(cityKey);
   cityRef.current = cityKey;
@@ -139,12 +140,12 @@ export default function App() {
   }, []);
 
   const handleTap = useCallback((lat: number, lon: number, tapped: MapHit | null) => {
+    if (directions.handleMapTap(lat, lon)) return;
     if (historyOpen) {
       // Đang xem lại: chỉ các chấm đối chiếu mở thẻ; chạm chỗ khác thì đóng thẻ.
       setHistoryPlace(tapped?.kind === "history" ? tapped.place : null);
       return;
     }
-    if (directions.handleMapTap(lat, lon)) return;
     reverseRef.current?.abort();
     setLayersOpen(false);
     if (tapped?.kind === "camera") {
@@ -251,7 +252,7 @@ export default function App() {
   const sheet = camera ? "24rem" : pin ? (note ? "20rem" : "13rem") : "0px";
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: historyOpen ? (historyPlace ? "18rem" : "0px") : directions.isOpen ? (directions.routes.length || directions.loading ? "48dvh" : "0px") : sheet }}>
+    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: historyOpen && !directions.isOpen ? (historyPlace ? "18rem" : "0px") : directions.isOpen ? (directions.routes.length || directions.loading ? "48dvh" : "0px") : sheet }}>
       <MapView
         initial={initial}
         pin={directions.isOpen ? null : pin}
@@ -334,7 +335,7 @@ export default function App() {
       {reporting && pin && (
         <ReportSheet place={pin.name || "Điểm đã chọn"} busy={sending} onChoose={sendReport} onClose={() => setReporting(false)} />
       )}
-      {historyOpen && (
+      {historyOpen && !directions.isOpen && (
         <HistoryPanel
           history={history}
           error={historyError}
@@ -343,11 +344,20 @@ export default function App() {
             setHistoryId(id);
             setHistoryPlace(null);
           }}
+          onRoute={() => {
+            setHistoryPlace(null);
+            directions.openBlank();
+          }}
           onClose={closeHistory}
         />
       )}
-      {historyOpen && historyPlace && <HistoryPlaceCard place={historyPlace} onClose={() => setHistoryPlace(null)} />}
-      <DirectionsTop directions={directions} near={center} onLocated={(lat, lon, accuracy) => setUserLocation({ lat, lon, accuracy })} />
+      {historyOpen && historyPlace && !directions.isOpen && <HistoryPlaceCard place={historyPlace} onClose={() => setHistoryPlace(null)} />}
+      <DirectionsTop
+        directions={directions}
+        near={center}
+        onLocated={(lat, lon, accuracy) => setUserLocation({ lat, lon, accuracy })}
+        replay={historyOpen && historyEvent ? historyEvent.title : null}
+      />
       <DirectionsPanel directions={directions} />
 
       {notice && (

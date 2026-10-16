@@ -10,14 +10,16 @@ export interface RouteRequestParams {
   origin: string;
   destination: string;
   vehicle: Vehicle;
+  event?: string; // tái hiện: tìm đường theo bản đồ ngập của một trận đã qua
 }
 
-export function buildRouteParams(origin: RoutePoint, destination: RoutePoint, vehicle: Vehicle): RouteRequestParams {
+export function buildRouteParams(origin: RoutePoint, destination: RoutePoint, vehicle: Vehicle, event: string | null = null): RouteRequestParams {
   return {
     city: "hcm",
     origin: `${origin.lat},${origin.lon}`,
     destination: `${destination.lat},${destination.lon}`,
     vehicle,
+    ...(event ? { event } : {}),
   };
 }
 

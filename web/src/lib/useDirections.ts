@@ -31,6 +31,7 @@ export interface DirectionsController {
   loading: boolean;
   startTo: (pin: PlacePoint, userLocation: RoutePoint | null) => void;
   startFrom: (pin: PlacePoint) => void;
+  openBlank: () => void;
   close: () => void;
   swap: () => void;
   setVehicle: (vehicle: Vehicle) => void;
@@ -54,7 +55,8 @@ function endpointFromPoint(point: PlacePoint, fallback: string): DirectionEndpoi
   };
 }
 
-export function useDirections(): DirectionsController {
+/** `event`: id của một trận đã qua để tìm đường theo bản đồ ngập của trận đó; null là lúc này. */
+export function useDirections(event: string | null = null): DirectionsController {
   const [isOpen, setIsOpen] = useState(false);
   const [origin, setOrigin] = useState<DirectionEndpoint | null>(null);
   const [destination, setDestination] = useState<DirectionEndpoint | null>(null);
@@ -104,6 +106,15 @@ export function useDirections(): DirectionsController {
     },
     [cancelRequest, clearResult],
   );
+
+  const openBlank = useCallback(() => {
+    cancelRequest();
+    clearResult();
+    setIsOpen(true);
+    setOrigin(null);
+    setDestination(null);
+    setActiveEndpointState("origin");
+  }, [cancelRequest, clearResult]);
 
   const close = useCallback(() => {
     cancelRequest();
@@ -195,7 +206,7 @@ export function useDirections(): DirectionsController {
     setError(null);
 
     api
-      .route(buildRouteParams(origin, destination, vehicle), controller.signal)
+      .route(buildRouteParams(origin, destination, vehicle, event), controller.signal)
       .then((result) => {
         if (controller.signal.aborted) return;
         setRoutes(result.routes);
@@ -219,7 +230,7 @@ export function useDirections(): DirectionsController {
       controller.abort();
       if (requestRef.current === controller) requestRef.current = null;
     };
-  }, [destination, isOpen, origin, vehicle]);
+  }, [destination, isOpen, origin, vehicle, event]);
 
   return {
     isOpen,
@@ -235,6 +246,7 @@ export function useDirections(): DirectionsController {
     loading,
     startTo,
     startFrom,
+    openBlank,
     close,
     swap,
     setVehicle,

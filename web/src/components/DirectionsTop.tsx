@@ -12,6 +12,7 @@ interface Props {
   directions: DirectionsController;
   near: { lat: number; lon: number };
   onLocated: (lat: number, lon: number, accuracy: number) => void;
+  replay?: string | null; // tên trận đang tái hiện, nếu có
 }
 
 const PLACEHOLDER: Record<DirectionEnd, string> = { origin: "Chọn điểm đi", destination: "Chọn điểm đến" };
@@ -37,7 +38,7 @@ function Row({ icon, title, sub, onClick, tone = "text-ink-soft" }: { icon: Icon
 }
 
 /** Đầu màn hình khi chỉ đường, giống Google Maps: hai ô điểm đi, điểm đến có đường nối, nút đổi chiều, chọn loại xe. */
-export default function DirectionsTop({ directions, near, onLocated }: Props) {
+export default function DirectionsTop({ directions, near, onLocated, replay = null }: Props) {
   const { origin, destination, activeEndpoint } = directions;
   const [editing, setEditing] = useState<DirectionEnd | null>(null);
   const [picking, setPicking] = useState(false);
@@ -193,6 +194,13 @@ export default function DirectionsTop({ directions, near, onLocated }: Props) {
           })}
         </div>
       </section>
+
+      {replay && (
+        <div className="pop-in pointer-events-auto flex items-center gap-2 self-start rounded-full bg-ink px-3 py-1.5 text-[13px] font-medium text-white shadow-float">
+          <Icon name="clock" className="h-4 w-4 shrink-0 text-amber-300" />
+          Tái hiện bản đồ ngập: {replay}
+        </div>
+      )}
 
       {picking && activeEndpoint && (
         <div className="pop-in pointer-events-auto flex items-center gap-2 rounded-2xl bg-ink px-4 py-2.5 text-sm text-white shadow-float">
