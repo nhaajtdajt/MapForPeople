@@ -1,54 +1,19 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useId, useState } from "react";
 
-import { api, isAbort, type PlaceDetail, type Suggestion } from "../api";
+import { api, type PlaceDetail, type Suggestion } from "../api";
+import { MIN_CHARS, usePlaceSearch } from "../lib/usePlaceSearch";
 import Icon from "./Icon";
-
-const MIN_CHARS = 2;
-const DEBOUNCE_MS = 300;
 
 interface Props {
   near: { lat: number; lon: number };
   onPick: (place: PlaceDetail) => void;
 }
 
-type Status = "idle" | "loading" | "empty" | "error";
-
 export default function SearchBar({ near, onPick }: Props) {
   const [text, setText] = useState("");
-  const [items, setItems] = useState<Suggestion[]>([]);
-  const [status, setStatus] = useState<Status>("idle");
-  const [message, setMessage] = useState("");
   const [open, setOpen] = useState(false);
-  const nearRef = useRef(near);
-  nearRef.current = near;
+  const { items, status, message, setStatus, setMessage, clear } = usePlaceSearch(text, near);
   const listId = useId();
-
-  useEffect(() => {
-    const query = text.trim();
-    if (query.length < MIN_CHARS) {
-      setItems([]);
-      setStatus("idle");
-      return;
-    }
-    const controller = new AbortController();
-    const timer = window.setTimeout(async () => {
-      setStatus("loading");
-      try {
-        const found = await api.autocomplete(query, nearRef.current, controller.signal);
-        setItems(found);
-        setStatus(found.length === 0 ? "empty" : "idle");
-      } catch (error) {
-        if (isAbort(error)) return;
-        setItems([]);
-        setStatus("error");
-        setMessage(error instanceof Error ? error.message : "Không tìm được địa điểm lúc này");
-      }
-    }, DEBOUNCE_MS);
-    return () => {
-      window.clearTimeout(timer);
-      controller.abort();
-    };
-  }, [text]);
 
   async function choose(item: Suggestion) {
     setOpen(false);
@@ -90,7 +55,7 @@ export default function SearchBar({ near, onPick }: Props) {
             aria-label="Xóa nội dung tìm kiếm"
             onClick={() => {
               setText("");
-              setItems([]);
+              clear();
             }}
             className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-ink-faint hover:bg-mist hover:text-ink"
           >

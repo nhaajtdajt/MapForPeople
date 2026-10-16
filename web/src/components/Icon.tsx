@@ -1,5 +1,47 @@
 // Bộ biểu tượng của app: nét 2px, đầu tròn, cùng một khung 24 × 24. Thêm biểu tượng mới ở đây, không dùng ký tự thay biểu tượng.
 const PATHS = {
+  back: <path d="M15 5l-7 7 7 7" />,
+  chevron: <path d="m6 9 6 6 6-6" />,
+  locate: (
+    <>
+      <circle cx="12" cy="12" r="7" />
+      <circle cx="12" cy="12" r="2.5" fill="currentColor" />
+      <path d="M12 2v3M12 19v3M2 12h3M19 12h3" />
+    </>
+  ),
+  map: (
+    <>
+      <path d="M9 4 3 6v14l6-2 6 2 6-2V4l-6 2-6-2Z" />
+      <path d="M9 4v14M15 6v14" />
+    </>
+  ),
+  clock: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 7v5l3 2" />
+    </>
+  ),
+  bike: (
+    <>
+      <circle cx="5.5" cy="16.5" r="3" />
+      <circle cx="18.5" cy="16.5" r="3" />
+      <path d="M5.5 16.5 9 10h5l2.5 6.5M12 10l-1.5-3H8M14 10l2-3h2.5" />
+    </>
+  ),
+  car: (
+    <>
+      <path d="M5 16V11l2-5h10l2 5v5" />
+      <path d="M3 16h18v3H3zM5 11h14" />
+      <circle cx="7.5" cy="16" r="1" fill="currentColor" />
+      <circle cx="16.5" cy="16" r="1" fill="currentColor" />
+    </>
+  ),
+  pin: (
+    <>
+      <path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21Z" />
+      <circle cx="12" cy="9.5" r="2.5" />
+    </>
+  ),
   close: <path d="M6 6l12 12M18 6 6 18" />,
   layers: (
     <>

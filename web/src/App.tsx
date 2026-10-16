@@ -5,6 +5,7 @@ import CameraCard from "./components/CameraCard";
 import LayersPanel from "./components/LayersPanel";
 import PlaceCard, { type Pin } from "./components/PlaceCard";
 import DirectionsPanel from "./components/DirectionsPanel";
+import DirectionsTop from "./components/DirectionsTop";
 import ReportSheet from "./components/ReportSheet";
 import Icon from "./components/Icon";
 import Legend from "./components/Legend";
@@ -204,7 +205,7 @@ export default function App() {
   const sheet = camera ? "24rem" : pin ? (note ? "20rem" : "13rem") : "0px";
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: directions.isOpen ? "50dvh" : sheet }}>
+    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: directions.isOpen ? (directions.routes.length || directions.loading ? "48dvh" : "0px") : sheet }}>
       <MapView
         initial={initial}
         pin={directions.isOpen ? null : pin}
@@ -229,7 +230,7 @@ export default function App() {
         onNotice={setNotice}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:max-w-xl">
+      <div hidden={directions.isOpen} className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:max-w-xl">
         <div className="pointer-events-auto flex items-start gap-2">
           <SearchBar near={center} onPick={handlePick} />
           <button
@@ -285,7 +286,8 @@ export default function App() {
       {reporting && pin && (
         <ReportSheet place={pin.name || "Điểm đã chọn"} busy={sending} onChoose={sendReport} onClose={() => setReporting(false)} />
       )}
-      <DirectionsPanel directions={directions} near={center} />
+      <DirectionsTop directions={directions} near={center} onLocated={(lat, lon, accuracy) => setUserLocation({ lat, lon, accuracy })} />
+      <DirectionsPanel directions={directions} />
 
       {notice && (
         <div role="status" className="pointer-events-none absolute inset-x-0 top-32 z-30 flex justify-center px-4">

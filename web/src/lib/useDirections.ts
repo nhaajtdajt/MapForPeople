@@ -34,8 +34,9 @@ export interface DirectionsController {
   close: () => void;
   swap: () => void;
   setVehicle: (vehicle: Vehicle) => void;
-  setActiveEndpoint: (endpoint: DirectionEnd) => void;
+  setActiveEndpoint: (endpoint: DirectionEnd | null) => void;
   choosePlace: (place: PlaceDetail) => void;
+  choosePoint: (end: DirectionEnd, point: DirectionEndpoint) => void;
   handleMapTap: (lat: number, lon: number) => boolean;
   selectRoute: (routeId: number) => void;
 }
@@ -131,14 +132,8 @@ export function useDirections(): DirectionsController {
     setActiveEndpointState((current) => (current === "origin" ? "destination" : current === "destination" ? "origin" : null));
   }, [cancelRequest, clearResult, destination, origin]);
 
-  const activateEndpoint = useCallback(
-    (end: DirectionEnd) => {
-      cancelRequest();
-      clearResult();
-      setActiveEndpointState(end);
-    },
-    [cancelRequest, clearResult],
-  );
+  // Chọn ô đang sửa không xóa lộ trình đang có: chỉ khi điểm thật sự đổi thì mới tìm lại.
+  const activateEndpoint = useCallback((end: DirectionEnd | null) => setActiveEndpointState(end), []);
 
   const setEndpoint = useCallback(
     (end: DirectionEnd, point: DirectionEndpoint) => {
@@ -171,7 +166,20 @@ export function useDirections(): DirectionsController {
         label: `${lat.toFixed(5)}, ${lon.toFixed(5)}`,
         address: "",
       };
-      setEndpoint(activeEndpoint, point);
+      const end = activeEndpoint;
+      setEndpoint(end, { ...point, label: "Điểm trên bản đồ" });
+      // Đổi tọa độ ra tên đường cho dễ đọc; lỗi thì giữ nhãn "Điểm trên bản đồ".
+      api
+        .reverse(lat, lon)
+        .then((found) => {
+          const label = found.name || found.address;
+          if (!label) return;
+          const rename = (current: DirectionEndpoint | null) =>
+            current && current.lat === lat && current.lon === lon ? { ...current, label, address: found.address } : current;
+          if (end === "origin") setOrigin(rename);
+          else setDestination(rename);
+        })
+        .catch(() => undefined);
       return true;
     },
     [activeEndpoint, isOpen, setEndpoint],
@@ -232,6 +240,7 @@ export function useDirections(): DirectionsController {
     setVehicle,
     setActiveEndpoint: activateEndpoint,
     choosePlace,
+    choosePoint: setEndpoint,
     handleMapTap,
     selectRoute,
   };
