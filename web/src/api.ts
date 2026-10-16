@@ -70,6 +70,39 @@ export interface RiskHour {
   counts: { high: number; medium: number };
 }
 
+/** Một chỗ trong trận ngập đã qua: ngập thật (hoặc camera thấy khô), app đã báo gì, và vì sao. */
+export interface HistoryPlace {
+  name: string;
+  lat: number;
+  lon: number;
+  observed: string;
+  result: "hit" | "miss" | "false_alarm" | "quiet_ok";
+  level: 0 | 1 | 2;
+  segments: { total: number; coloured: number; red: number };
+  shown: string;
+  basis: string[];
+}
+
+export interface HistoryEvent {
+  id: string;
+  cause: "rain" | "tide";
+  title: string;
+  when: string;
+  note: string;
+  basis: string[];
+  sources: { label: string; url: string }[];
+  summary: { hit: number; miss: number; false_alarm: number; quiet_ok: number; red: number; yellow: number };
+  predicted: [number, number][];
+  tide_extent: { red: number; coloured: number } | null;
+  places: HistoryPlace[];
+}
+
+export interface FloodHistory {
+  city: CityKey;
+  built: string;
+  events: HistoryEvent[];
+}
+
 /** Mức nguy cơ lúc này và hai giờ tới của một thành phố (GET /api/risk). */
 export interface RiskState {
   city: CityKey;
@@ -254,6 +287,7 @@ export const api = {
     getJson<Suggestion[]>("/api/places/autocomplete", { q, lat: near?.lat, lon: near?.lon }, signal),
   placeDetail: (placeId: string, signal?: AbortSignal) =>
     getJson<PlaceDetail>("/api/places/detail", { place_id: placeId }, signal),
+  history: (city: CityKey, signal?: AbortSignal) => getJson<FloodHistory>("/api/history", { city }, signal),
   reverse: (lat: number, lon: number, signal?: AbortSignal) =>
     getJson<ReverseResult>("/api/places/reverse", { lat, lon }, signal),
   risk: (city: CityKey, signal?: AbortSignal) => getJson<RiskState>("/api/risk", { city }, signal),

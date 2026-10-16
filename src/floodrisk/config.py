@@ -67,6 +67,11 @@ def flood_points_path(city: str) -> Path:
     return processed_dir(city) / "diem_ngap_pc08_2026-10-06.csv"
 
 
+def history_path(city: str) -> Path:
+    """Các trận ngập để xem lại: app đã tô gì, chỗ nào đúng, chỗ nào sót (tools/dung_lich_su_ngap.py)."""
+    return processed_dir(city) / "lich_su_ngap.json"
+
+
 def units_path(city: str) -> Path:
     return processed_dir(city) / "units.parquet"
 

@@ -1,6 +1,6 @@
 import type { City, CityKey } from "../api";
 import { CAMERA_COLOR, LEVEL_COLOR, POINT_COLOR, REPORT_COLOR } from "../MapView";
-import { CloseButton } from "./Icon";
+import Icon, { CloseButton } from "./Icon";
 
 interface Props {
   cities: City[];
@@ -12,6 +12,7 @@ interface Props {
   onShowRisk: (value: boolean) => void;
   onShowPoints: (value: boolean) => void;
   onShowCameras: (value: boolean) => void;
+  onHistory: () => void;
   onClose: () => void;
 }
 
@@ -24,7 +25,7 @@ function Dot({ color }: { color: string }) {
 }
 
 /** Bảng "Lớp": bật tắt lớp ngập kèm chú giải, và chọn thành phố. Lớp giao thông và kiểu nền được thêm cùng spec 09. */
-export default function LayersPanel({ cities, current, showRisk, showPoints, showCameras, onCity, onShowRisk, onShowPoints, onShowCameras, onClose }: Props) {
+export default function LayersPanel({ cities, current, showRisk, showPoints, showCameras, onCity, onShowRisk, onShowPoints, onShowCameras, onHistory, onClose }: Props) {
   return (
     <section
       aria-label="Lớp bản đồ"
@@ -76,7 +77,19 @@ export default function LayersPanel({ cities, current, showRisk, showPoints, sho
         </li>
       </ul>
 
-      <h2 className="mt-1 border-t border-line pt-3 text-base font-semibold tracking-[-0.01em] text-ink">Thành phố</h2>
+      <button
+        type="button"
+        onClick={onHistory}
+        className="mt-1 flex min-h-12 w-full items-center gap-3 rounded-2xl bg-brand-tint px-3 text-left text-brand-strong transition-colors hover:bg-[#d8e5f4]"
+      >
+        <Icon name="clock" className="h-5 w-5 shrink-0" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[15px] font-semibold">Xem lại các trận ngập</span>
+          <span className="block text-xs text-ink-soft">App đã báo đúng, sót ở đâu, vì sao</span>
+        </span>
+      </button>
+
+      <h2 className="mt-3 border-t border-line pt-3 text-base font-semibold tracking-[-0.01em] text-ink">Thành phố</h2>
       <div role="radiogroup" aria-label="Thành phố" className="mt-1 flex flex-col gap-1">
         {cities.map((city) => (
           <button

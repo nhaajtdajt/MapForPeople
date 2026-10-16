@@ -17,7 +17,7 @@ import workerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?worker&url";
 import type { FeatureCollection } from "geojson";
 import { useEffect, useRef, useState } from "react";
 
-import { serverUrl, type Camera, type FloodPointProps, type FloodPoints, type FloodReport, type RouteOption } from "./api";
+import { serverUrl, type Camera, type FloodPointProps, type FloodPoints, type FloodReport, type HistoryPlace, type RouteOption } from "./api";
 import { addRouteLayers, selectRouteAtPoint, updateRouteLayers } from "./lib/routeLayer";
 import type { DirectionEndpoint } from "./lib/useDirections";
 import { levelExpression, NO_TIDE, type DayState, type RouteProps, type TideExtent } from "./lib/risk";
@@ -36,6 +36,10 @@ const CAMERA_SOURCE = "cameras";
 const CAMERA_LAYER = "cameras";
 const REPORT_SOURCE = "reports";
 const REPORT_LAYER = "reports";
+const HISTORY_SOURCE = "history-places";
+const HISTORY_LAYER = "history-places";
+// Chỗ ngập thật khi xem lại: xanh lá là app báo đúng, đỏ viền là app bỏ sót; chỗ camera thấy khô: xanh nhạt là đúng, cam là báo thừa.
+export const HISTORY_COLOR = { hit: "#15803d", miss: "#dc2626", quiet_ok: "#0d9488", false_alarm: "#ea580c" } as const;
 export const CAMERA_COLOR = "#475569";
 export const REPORT_COLOR = { flooded: "#b91c1c", clear: "#15803d" } as const;
 export const LEVEL_COLOR = { 1: "#f59e0b", 2: "#dc2626" } as const;
@@ -55,7 +59,8 @@ const EMPTY: FeatureCollection = { type: "FeatureCollection", features: [] };
 export type MapHit =
   | { kind: "route"; route: RouteProps; id: number }
   | { kind: "point"; point: FloodPointProps }
-  | { kind: "camera"; camera: Camera };
+  | { kind: "camera"; camera: Camera }
+  | { kind: "history"; place: HistoryPlace };
 
 export interface RiskView {
   url: string; // đường dẫn lớp tuyến trên máy chủ, đổi khi mô hình được dựng lại
@@ -131,6 +136,45 @@ function addRiskLayers(map: MapLibreMap): void {
       "circle-stroke-width": 1,
     },
   });
+  map.addSource(HISTORY_SOURCE, { type: "geojson", data: EMPTY });
+  map.addLayer({
+    id: HISTORY_LAYER,
+    type: "circle",
+    source: HISTORY_SOURCE,
+    paint: {
+      "circle-radius": ["interpolate", ["linear"], ["zoom"], 10, 7, 15, 12],
+      "circle-color": ["match", ["get", "result"], "miss", "#ffffff", "hit", HISTORY_COLOR.hit, "false_alarm", HISTORY_COLOR.false_alarm, HISTORY_COLOR.quiet_ok],
+      "circle-stroke-color": ["match", ["get", "result"], "miss", HISTORY_COLOR.miss, "#ffffff"],
+      "circle-stroke-width": ["match", ["get", "result"], "miss", 4, 2.5],
+    },
+  });
+  const font = map
+    .getStyle()
+    .layers.map((layer) => (layer.type === "symbol" ? layer.layout?.["text-font"] : undefined))
+    .find((value): value is string[] => Array.isArray(value) && value.every((item) => typeof item === "string"));
+  if (font) {
+    map.addLayer({
+      id: `${HISTORY_LAYER}-labels`,
+      type: "symbol",
+      source: HISTORY_SOURCE,
+      layout: {
+        "text-field": ["concat", ["match", ["get", "result"], "hit", "Đúng · ", "miss", "Sót · ", "false_alarm", "Báo thừa · ", ""], ["get", "name"]],
+        "text-font": font,
+        "text-size": 12,
+        "text-offset": [0, 1.5],
+        "text-anchor": "top",
+        "text-max-width": 10,
+        // Vài nhãn đối chiếu luôn hiện, không nhường chỗ cho nhãn của bản đồ nền.
+        "text-allow-overlap": true,
+        "text-ignore-placement": true,
+      },
+      paint: {
+        "text-color": ["match", ["get", "result"], "miss", HISTORY_COLOR.miss, "hit", HISTORY_COLOR.hit, "false_alarm", HISTORY_COLOR.false_alarm, "#0f1d2e"],
+        "text-halo-color": "#ffffff",
+        "text-halo-width": 1.6,
+      },
+    });
+  }
   map.addSource(REPORT_SOURCE, { type: "geojson", data: EMPTY });
   map.addLayer({
     id: REPORT_LAYER,
@@ -168,6 +212,7 @@ interface Props {
   cameras: Camera[];
   showCameras: boolean;
   reports: FloodReport[];
+  historyPlaces: HistoryPlace[];
   routes: RouteOption[];
   selectedRouteId: number | null;
   routeRevision: number;
@@ -214,7 +259,7 @@ class DisabledLocateControl implements IControl {
   }
 }
 
-export default function MapView({ initial, pin, flyTo, risk, showRisk, points, showPoints, cameras, showCameras, reports, routes, selectedRouteId, routeRevision, directionOrigin, directionDestination, directionsOpen, onRouteSelect, onTap, onMoveEnd, onLocate, onNotice }: Props) {
+export default function MapView({ initial, pin, flyTo, risk, showRisk, points, showPoints, cameras, showCameras, reports, historyPlaces, routes, selectedRouteId, routeRevision, directionOrigin, directionDestination, directionsOpen, onRouteSelect, onTap, onMoveEnd, onLocate, onNotice }: Props) {
   const [ready, setReady] = useState(false); // kiểu bản đồ nền đã nạp xong, thêm lớp được
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
@@ -260,11 +305,18 @@ export default function MapView({ initial, pin, flyTo, risk, showRisk, points, s
     map.on("click", (event) => {
       if (selectRouteAtPoint(map, event.point, callbacks.current.onRouteSelect)) return;
       const { x, y } = event.point;
-      const layers = [CAMERA_LAYER, POINT_LAYER, ...RISK_LAYERS.map((layer) => layer.id)].filter((id) => map.getLayer(id));
+      const layers = [HISTORY_LAYER, CAMERA_LAYER, POINT_LAYER, ...RISK_LAYERS.map((layer) => layer.id)].filter((id) => map.getLayer(id));
       const hits = layers.length > 0 ? map.queryRenderedFeatures([[x - TAP_RADIUS_PX, y - TAP_RADIUS_PX], [x + TAP_RADIUS_PX, y + TAP_RADIUS_PX]], { layers }) : [];
+      const past = hits.find((feature) => feature.layer.id === HISTORY_LAYER);
+      if (past) {
+        const props = past.properties as Record<string, unknown>;
+        const place = { ...props, basis: JSON.parse(String(props.basis)), segments: JSON.parse(String(props.segments)) } as HistoryPlace;
+        callbacks.current.onTap(event.lngLat.lat, event.lngLat.lng, { kind: "history", place });
+        return;
+      }
       const camera = hits.find((feature) => feature.layer.id === CAMERA_LAYER);
       const point = hits.find((feature) => feature.layer.id === POINT_LAYER);
-      const route = hits.find((feature) => feature.layer.id !== POINT_LAYER && feature.layer.id !== CAMERA_LAYER);
+      const route = hits.find((feature) => feature.layer.id !== POINT_LAYER && feature.layer.id !== CAMERA_LAYER && feature.layer.id !== HISTORY_LAYER);
       const hit: MapHit | null = camera
         ? { kind: "camera", camera: camera.properties as Camera }
         : point
@@ -339,6 +391,19 @@ export default function MapView({ initial, pin, flyTo, risk, showRisk, points, s
     if (!map || !ready) return;
     (map.getSource(REPORT_SOURCE) as GeoJSONSource).setData(pointFeatures(reports));
   }, [ready, reports]);
+
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !ready) return;
+    // MapLibre chỉ giữ thuộc tính phẳng: mảng lý do và số đoạn được gói thành chuỗi, mở lại khi chạm.
+    const flat = historyPlaces.map((place) => ({ ...place, basis: JSON.stringify(place.basis), segments: JSON.stringify(place.segments) }));
+    (map.getSource(HISTORY_SOURCE) as GeoJSONSource).setData(pointFeatures(flat));
+    if (historyPlaces.length > 0) {
+      const lats = historyPlaces.map((p) => p.lat);
+      const lons = historyPlaces.map((p) => p.lon);
+      map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]], { padding: { top: 260, bottom: 70, left: 50, right: 60 }, maxZoom: 15, duration: 900 });
+    }
+  }, [ready, historyPlaces]);
 
   useEffect(() => {
     const map = mapRef.current;

@@ -212,3 +212,12 @@ def test_risk_sends_the_tide_extent_and_forecast_from_phu_an(model_data):
     assert body["tide_extent"] == {"red": 5, "coloured": 10} and body["overrides"] == {}
     assert body["counts_now"] == {"high": 5, "medium": 5} and body["states"]["tide"] == "alert"
     assert len(body["tide_forecast"]) == 12 and body["tide_forecast"][0]["level_m"] == 1.65
+
+
+def test_history_is_served_when_built_and_404_before(model_data):
+    client, _ = _client(_rain(0.0))
+    assert client.get("/api/history").status_code == 404
+    config.history_path("hcm").write_text(json.dumps({"city": "hcm", "built": "x", "events": [{"id": "a"}]}), encoding="utf-8")
+    first = client.get("/api/history")
+    assert first.status_code == 200 and first.json()["events"][0]["id"] == "a"
+    assert client.get("/api/history", headers={"If-None-Match": first.headers["etag"]}).status_code == 304

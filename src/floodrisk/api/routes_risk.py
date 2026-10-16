@@ -207,6 +207,19 @@ def register(app: FastAPI, ctx: Context) -> None:
             raise HTTPException(422, f"Trạng thái radar không đọc được: {exc}") from None
         return {"ok": True}
 
+    @app.get("/api/history")
+    def history(request: Request, city: str = "hcm"):
+        """Các trận ngập đã qua: bản đồ lúc đó tô gì theo đúng quy tắc đang chạy, và đối chiếu với chỗ ngập thật."""
+        _city(city)
+        path = config.history_path(city)
+        if not path.exists():
+            raise HTTPException(404, "Chưa dựng dữ liệu xem lại cho thành phố này")
+        etag = f'"{_file_version(path)}"'
+        headers = {"ETag": etag, "Cache-Control": "no-cache"}
+        if request.headers.get("if-none-match") == etag:
+            return Response(status_code=304, headers=headers)
+        return Response(path.read_bytes(), media_type="application/json", headers=headers)
+
     @app.get("/api/risk/routes")
     def risk_routes(request: Request, city: str = "hcm"):
         """Hình học các tuyến thuộc nhóm A hoặc B của mô hình (GeoJSON nén gzip). Đổi khi mô hình được dựng lại."""

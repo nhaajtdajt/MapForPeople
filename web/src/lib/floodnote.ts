@@ -21,7 +21,7 @@ export function tideExtentOf(risk: Pick<RiskState, "tide_extent"> | null): TideE
 
 /** Nội dung ô thông tin ngập trên thẻ địa điểm, từ thứ người dùng vừa chạm trúng. */
 export function floodNote(hit: MapHit | null, now: RiskHour | null, risk: RiskState | null = null): FloodNote | null {
-  if (!hit || hit.kind === "camera") return null;
+  if (!hit || hit.kind === "camera" || hit.kind === "history") return null;
   if (hit.kind === "point") {
     const cause = hit.point.cause === "tide" ? "triều cường" : "mưa lớn, nước không thoát kịp";
     return {

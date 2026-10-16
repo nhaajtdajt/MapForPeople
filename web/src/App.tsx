@@ -1,18 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { api, ApiError, isAbort, type Camera, type City, type CityKey, type FloodPoints, type FloodReport, type Health, type PlaceDetail, type ReportBody, type RiskState } from "./api";
+import { api, ApiError, isAbort, type Camera, type City, type CityKey, type FloodHistory, type FloodPoints, type FloodReport, type Health, type HistoryPlace, type PlaceDetail, type ReportBody, type RiskState } from "./api";
 import CameraCard from "./components/CameraCard";
 import LayersPanel from "./components/LayersPanel";
 import PlaceCard, { type Pin } from "./components/PlaceCard";
 import DirectionsPanel from "./components/DirectionsPanel";
 import DirectionsTop from "./components/DirectionsTop";
 import ReportSheet from "./components/ReportSheet";
+import HistoryPanel, { HistoryPlaceCard } from "./components/HistoryPanel";
 import Icon from "./components/Icon";
 import Legend from "./components/Legend";
 import SearchBar from "./components/SearchBar";
 import StatusBar from "./components/StatusBar";
 import StatusChip from "./components/StatusChip";
 import { floodNote, tideExtentOf } from "./lib/floodnote";
+import { NO_TIDE } from "./lib/risk";
 import { loadView, saveView } from "./lib/viewstore";
 import { useDirections } from "./lib/useDirections";
 import MapView, { type FlyTarget, type MapHit, type MapViewState } from "./MapView";
@@ -37,6 +39,7 @@ function userId(): string {
   }
 }
 const CITY_LABELS: Record<CityKey, string> = { hcm: "TP.HCM", danang: "Đà Nẵng" };
+const EMPTY_PLACES: HistoryPlace[] = [];
 
 export default function App() {
   const [saved] = useState(loadView);
@@ -63,6 +66,12 @@ export default function App() {
   const [layersOpen, setLayersOpen] = useState(false);
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number; accuracy: number } | null>(null);
   const directions = useDirections();
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [history, setHistory] = useState<FloodHistory | null>(null);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [historyId, setHistoryId] = useState<string | null>(null);
+  const [historyPlace, setHistoryPlace] = useState<HistoryPlace | null>(null);
+  const historyEvent = history?.events.find((event) => event.id === historyId) ?? null;
 
   const cityRef = useRef(cityKey);
   cityRef.current = cityKey;
@@ -130,6 +139,11 @@ export default function App() {
   }, []);
 
   const handleTap = useCallback((lat: number, lon: number, tapped: MapHit | null) => {
+    if (historyOpen) {
+      // Đang xem lại: chỉ các chấm đối chiếu mở thẻ; chạm chỗ khác thì đóng thẻ.
+      setHistoryPlace(tapped?.kind === "history" ? tapped.place : null);
+      return;
+    }
     if (directions.handleMapTap(lat, lon)) return;
     reverseRef.current?.abort();
     setLayersOpen(false);
@@ -151,7 +165,29 @@ export default function App() {
       .catch((error) => {
         if (!isAbort(error)) setPin({ lat, lon, name: "", address: "", loading: false });
       });
-  }, [directions.handleMapTap]);
+  }, [directions.handleMapTap, historyOpen]);
+
+  const openHistory = useCallback(() => {
+    setLayersOpen(false);
+    reverseRef.current?.abort();
+    setPin(null);
+    setHit(null);
+    setCamera(null);
+    directions.close();
+    setHistoryOpen(true);
+    setHistoryError(null);
+    if (!history)
+      api
+        .history(cityRef.current)
+        .then(setHistory)
+        .catch((error) => setHistoryError(error instanceof ApiError ? error.message : "Chưa tải được dữ liệu xem lại."));
+  }, [directions, history]);
+
+  const closeHistory = useCallback(() => {
+    setHistoryOpen(false);
+    setHistoryId(null);
+    setHistoryPlace(null);
+  }, []);
 
   const handlePick = useCallback(
     (place: PlaceDetail) => {
@@ -201,11 +237,21 @@ export default function App() {
 
   const now = risk?.hours[0] ?? null;
   const note = pin ? floodNote(hit, now, risk) : null;
-  const riskView = risk?.layer ? { url: risk.layer.url, rain: risk.states.rain, tide: tideExtentOf(risk), overrides: risk.overrides } : null;
+  const liveView = risk?.layer ? { url: risk.layer.url, rain: risk.states.rain, tide: tideExtentOf(risk), overrides: risk.overrides } : null;
+  // Xem lại: tô đúng như app đã tô lúc đó (mưa: từng tuyến; triều: theo thứ hạng triều).
+  // Lớp tuyến không phụ thuộc số liệu lúc này: xem lại được ngay cả khi mức nguy cơ chưa tải xong.
+  const layerUrl = liveView?.url ?? `/api/risk/routes?city=${cityKey}`;
+  const pastView =
+    historyOpen
+      ? historyEvent
+        ? { url: layerUrl, rain: "quiet" as const, tide: historyEvent.tide_extent ?? NO_TIDE, overrides: Object.fromEntries(historyEvent.predicted.map(([id, level]) => [String(id), level])) }
+        : { url: layerUrl, rain: "quiet" as const, tide: NO_TIDE, overrides: {} }
+      : null;
+  const riskView = pastView ?? liveView;
   const sheet = camera ? "24rem" : pin ? (note ? "20rem" : "13rem") : "0px";
 
   return (
-    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: directions.isOpen ? (directions.routes.length || directions.loading ? "48dvh" : "0px") : sheet }}>
+    <div className="relative h-dvh w-full overflow-hidden" style={{ ["--sheet-h" as string]: historyOpen ? (historyPlace ? "18rem" : "0px") : directions.isOpen ? (directions.routes.length || directions.loading ? "48dvh" : "0px") : sheet }}>
       <MapView
         initial={initial}
         pin={directions.isOpen ? null : pin}
@@ -214,9 +260,10 @@ export default function App() {
         showRisk={showRisk}
         points={points}
         showPoints={showPoints}
-        cameras={cameras}
-        showCameras={showCameras}
-        reports={reports}
+        cameras={historyOpen ? [] : cameras}
+        showCameras={showCameras && !historyOpen}
+        reports={historyOpen ? [] : reports}
+        historyPlaces={historyEvent?.places ?? EMPTY_PLACES}
         routes={directions.routes}
         selectedRouteId={directions.selectedRouteId}
         routeRevision={directions.routeRevision}
@@ -230,7 +277,7 @@ export default function App() {
         onNotice={setNotice}
       />
 
-      <div hidden={directions.isOpen} className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:max-w-xl">
+      <div hidden={directions.isOpen || historyOpen} className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:max-w-xl">
         <div className="pointer-events-auto flex items-start gap-2">
           <SearchBar near={center} onPick={handlePick} />
           <button
@@ -250,7 +297,7 @@ export default function App() {
         </div>
       </div>
 
-      {showRisk && riskView && !directions.isOpen && !pin && !camera && (
+      {showRisk && riskView && !directions.isOpen && !historyOpen && !pin && !camera && (
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] flex justify-start pb-[max(2.25rem,calc(env(safe-area-inset-bottom)+2rem))] pl-3 pr-16">
           <div className="pointer-events-auto">
             <Legend />
@@ -269,6 +316,7 @@ export default function App() {
           onShowRisk={setShowRisk}
           onShowPoints={setShowPoints}
           onShowCameras={setShowCameras}
+          onHistory={openHistory}
           onClose={() => setLayersOpen(false)}
         />
       )}
@@ -286,6 +334,19 @@ export default function App() {
       {reporting && pin && (
         <ReportSheet place={pin.name || "Điểm đã chọn"} busy={sending} onChoose={sendReport} onClose={() => setReporting(false)} />
       )}
+      {historyOpen && (
+        <HistoryPanel
+          history={history}
+          error={historyError}
+          selected={historyEvent}
+          onSelect={(id) => {
+            setHistoryId(id);
+            setHistoryPlace(null);
+          }}
+          onClose={closeHistory}
+        />
+      )}
+      {historyOpen && historyPlace && <HistoryPlaceCard place={historyPlace} onClose={() => setHistoryPlace(null)} />}
       <DirectionsTop directions={directions} near={center} onLocated={(lat, lon, accuracy) => setUserLocation({ lat, lon, accuracy })} />
       <DirectionsPanel directions={directions} />
 
