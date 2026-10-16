@@ -102,8 +102,12 @@ def rain_basis(row: int, level: int, stations, gauge_state, radar_state, radar_v
                      + (f" ({st['mm3']:g} mm trong 3 giờ)" if st["mm3"] > st["mm1"] else "") + ": "
                          f"{'báo động (từ 35 mm/giờ)' if st['state'] == 2 else 'cảnh giác (từ 30 mm/giờ)'}; trạm áp đủ mức cho đường trong {local.FULL_RADIUS_M / 1000:g} km, tối đa vàng tới {local.RADIUS_M / 1000:g} km.")
     elif nearest is not None:
-        lines.append(f"Trạm đo có số gần nhất ({nearest['name']}, cách {d[nearest['name']]:.1f} km) chỉ đo {max(nearest['mm1'], nearest['mm3']):g} mm: "
-                     f"{'dưới ngưỡng cảnh giác' if not nearest.get('state') else f'nhưng ở xa hơn {local.RADIUS_M / 1000:g} km'}.")
+        amount = max(nearest["mm1"], nearest["mm3"])
+        if nearest.get("state"):
+            lines.append(f"Trạm có số gần nhất ({nearest['name']}, cách {d[nearest['name']]:.1f} km) đo {amount:g} mm, nhưng ở xa hơn "
+                         f"{local.RADIUS_M / 1000:g} km nên không áp mức cho đoạn này. Ở đây không có trạm nào báo số.")
+        else:
+            lines.append(f"Trạm có số gần nhất ({nearest['name']}, cách {d[nearest['name']]:.1f} km) chỉ đo {amount:g} mm: dưới ngưỡng cảnh giác.")
     if has_radar:
         v = float(radar_value[row])
         if radar_state[row]:
@@ -183,6 +187,17 @@ def finish(eid, cause, title, when, level, truth, sources, note, basis, why, kin
         place["basis"] = [decimal(line) for line in place["basis"]]
     return {"id": eid, "cause": cause, "title": title, "when": when, "note": note, "basis": basis, "sources": sources,
             "summary": summary, "predicted": predicted, "tide_extent": tide_extent, "places": places}
+
+
+def truth_named(name, names, observed):
+    """Một chỗ gồm nhiều tên đường trong bảng tuyến (ví dụ hầm chui An Phú là hai nhánh HC1-01, HC1-02)."""
+    rows = np.concatenate([segments(n, (10.0, 11.5, 106.0, 107.5)) for n in names])
+    return {"name": name, "rows": rows, "observed": observed}
+
+
+def truth_area(name, lat, lon, radius_m, observed):
+    """Một khu vực báo chí nêu (không phải một con đường): các đoạn trong bán kính quanh vị trí ước lượng của khu."""
+    return {"name": name, "rows": np.flatnonzero(km(LAT, LON, lat, lon) * 1000 <= radius_m), "observed": observed}
 
 
 def truth_streets(items, observed):
@@ -341,9 +356,18 @@ def main() -> None:
         stations_from_totals({"Thảo Điền": 153.0, "Dương Văn Cam": 140.0, "Thanh Đa": 137.0, "Dương Quảng Hàm": 137.0, "Nguyễn Thị Sẳng": 129.0, "Bình Hưng Hòa": 120.0}), None,
         truth_streets([("Tô Ngọc Vân", (10.84, 10.88, 106.73, 106.77)), ("Nguyễn Duy Trinh", (10.78, 10.83, 106.76, 106.81)),
                        ("Quốc Hương", (10.79, 10.82, 106.72, 106.75)), ("Dương Văn Cam", (10.84, 10.86, 106.74, 106.76)), ("Hồ Văn Tư", (10.84, 10.86, 106.75, 106.77))],
-                      "Báo chí: 33 tuyến ngập (bài nêu tên một phần), Tô Ngọc Vân, Nguyễn Duy Trinh sâu 40-45 cm"),
-        [{"label": "VnExpress: 33 đường TP HCM ngập sau trận mưa lớn nhất từ đầu năm", "url": "https://vnexpress.net/33-duong-tp-hcm-ngap-sau-tran-mua-lon-nhat-tu-dau-nam-5119511.html"}],
-        "Tổng mưa cả trận (mạnh nhất 17–20h) báo chí nêu, xét như mưa 3 giờ. Bốn trạm (Thảo Điền, Thanh Đa, Dương Quảng Hàm, Bình Hưng Hòa) không có trong danh sách trạm của cổng nên vị trí là ước lượng theo tên. Trận này chưa dùng để chọn ngưỡng."))
+                      "VnExpress: một trong 33 tuyến ngập; Tô Ngọc Vân, Nguyễn Duy Trinh sâu 40-45 cm, khu Thảo Điền và chợ Thủ Đức khoảng 30 cm")
+        + [truth_named("Hầm chui An Phú", ["Hầm Chui HC1-01", "Hầm Chui HC1-02"], "VnExpress: hầm chui An Phú có đoạn ngập 0,8-1 m"),
+           truth_area("Khu đô thị An Phú (vị trí ước lượng)", 10.7965, 106.7435, 450, "VnExpress: khu đô thị Phát triển An Phú ngập khoảng 40 cm")]
+        + truth_streets([("D5", (10.79, 10.81, 106.70, 106.72)), ("Phạm Văn Xảo", (10.77, 10.80, 106.61, 106.63))],
+                        "Báo Tin Tức: ngập tối 10/9 (D5 nước tràn vào quán)")
+        + truth_streets([("Đặng Thị Rành", (10.84, 10.86, 106.74, 106.76)), ("Võ Chí Công", (10.75, 10.93, 106.76, 106.97)),
+                         ("Lê Chí Dân", (10.99, 11.05, 106.61, 106.65)), ("Quốc lộ 1K", (10.88, 10.93, 106.77, 106.81))],
+                        "Tuổi Trẻ: ngập tối 10/9"),
+        [{"label": "VnExpress: 33 đường TP HCM ngập sau trận mưa lớn nhất từ đầu năm", "url": "https://vnexpress.net/33-duong-tp-hcm-ngap-sau-tran-mua-lon-nhat-tu-dau-nam-5119511.html"},
+         {"label": "Tuổi Trẻ: Mưa lớn, nhiều tuyến đường TP.HCM ngập nặng, người dân chật vật về nhà", "url": "https://tuoitre.vn/mua-lon-nhieu-tuyen-duong-tphcm-ngap-nang-nguoi-dan-chat-vat-ve-nha-100260910184001121.htm"},
+         {"label": "Báo Tin Tức: Mưa lớn gây ngập cục bộ tại nhiều khu vực ở TP Hồ Chí Minh", "url": "https://baotintuc.vn/tp-ho-chi-minh-mua-lon-gay-ngap-tai-nhieu-khu-vuc-post1044339.html"}],
+        "Tổng mưa cả trận (mạnh nhất 17–20h) báo chí nêu, xét như mưa 3 giờ. Bốn trạm (Thảo Điền, Thanh Đa, Dương Quảng Hàm, Bình Hưng Hòa) không có trong danh sách trạm của cổng nên vị trí là ước lượng theo tên. Trận này chưa dùng để chọn ngưỡng. Chỉ chấm được 15 chỗ ba bài báo nêu tên; 33 tuyến ngập hôm đó không được công bố đủ tên, nên phần còn lại của bản đồ chưa có gì để đối chiếu."))
     order = ["mua-2026-10-15", "trieu-2026-10-13", "trieu-2026-10-11", "trieu-2026-10-10", "mua-2026-10-08", "mua-2026-10-07",
              "mua-2026-10-06", "mua-2026-10-01", "mua-2026-09-30", "mua-2026-09-22", "mua-2026-09-10"]
     events.sort(key=lambda e: order.index(e["id"]))

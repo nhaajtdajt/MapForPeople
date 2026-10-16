@@ -78,7 +78,7 @@ export default function HistoryPanel({ history, error, selected, onSelect, onRou
         {!selected && (
           <>
             <p className="mt-1 text-sm text-ink-soft">
-              Bản đồ được tô lại bằng đúng quy tắc app đang chạy, rồi so với chỗ ngập thật trên báo hoặc ảnh camera. Không chỉnh gì cho khớp.
+              Bản đồ được tô lại bằng đúng quy tắc app đang chạy, rồi so với chỗ ngập thật trên báo hoặc ảnh camera. Không chỉnh gì cho khớp. Chỉ chấm được những chỗ báo chí hoặc camera nêu; đường khác chưa có gì để đối chiếu.
             </p>
             {error && <p role="alert" className="mt-3 rounded-2xl bg-caution-tint px-3.5 py-3 text-sm text-caution-ink">{error}</p>}
             {!history && !error && <div className="mt-3 h-24 animate-pulse rounded-2xl bg-mist" />}
