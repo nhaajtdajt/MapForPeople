@@ -99,6 +99,7 @@ export interface RiskState {
   /** Tuyến đang có báo cáo: `shown` là mức được báo nhiều nhất (none là "không ngập"). */
   reports: { id: number; shown: "none" | "light" | "unknown" | "moderate" | "high"; count: number; last_at: string; sources: string[] }[];
   local: {
+    at: string;
     tide: { station: string; level_m: number; kind: "measured" | "model"; state: DayState } | null;
     gauges: { name: string; lat: number; lon: number; last_1h_mm: number; max_3h_mm: number; total_24h_mm: number; state: DayState }[];
     errors: string[];

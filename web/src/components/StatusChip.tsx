@@ -15,12 +15,12 @@ export default function StatusChip({ health }: { health: Health | null }) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((value) => !value)}
-        className="min-h-8 rounded-full bg-amber-100 px-3 text-xs font-medium text-amber-900 ring-1 ring-amber-300"
+        className="min-h-8 shrink-0 rounded-full bg-caution-tint px-3 text-xs font-semibold text-caution-ink shadow-float"
       >
         {text}
       </button>
       {open && (
-        <div role="status" className="absolute right-0 top-9 z-20 w-64 rounded-xl bg-white p-3 text-sm text-slate-800 shadow-lg ring-1 ring-slate-200">
+        <div role="status" className="pop-in absolute right-0 top-10 z-20 w-64 rounded-2xl bg-white p-4 text-sm text-ink-soft shadow-float ring-1 ring-line">
           <p>{health.data === "sample" ? "Đang chạy trên dữ liệu mẫu, không phải dữ liệu thật." : "Đang chạy trên dữ liệu thật."}</p>
           {fakes.length > 0 ? (
             <p className="mt-1">Các phần đang là bản giả: {fakes.join(", ")}.</p>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 
 import { api, ApiError, serverUrl, type Camera, type CameraReading } from "../api";
+import Icon, { CloseButton } from "./Icon";
 
 const REFRESH_MS = 15_000; // cổng camera đổi ảnh khoảng 12 giây một lần
 const TRAFFIC: Record<string, string> = { thong_thoang: "thông thoáng", dong: "đông, vẫn chạy", un_u: "ùn ứ", ket_cung: "kẹt cứng" };
@@ -54,33 +55,45 @@ export default function CameraCard({ camera, onClose, onRead }: Props) {
   return (
     <section
       aria-label="Camera giao thông"
-      className="absolute inset-x-0 bottom-0 z-10 rounded-t-2xl bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.15)] sm:inset-x-auto sm:bottom-4 sm:left-4 sm:w-96 sm:rounded-2xl"
+      className="sheet-in absolute inset-x-0 bottom-0 z-10 max-h-[80dvh] overflow-y-auto rounded-t-3xl bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5 shadow-sheet sm:inset-x-auto sm:bottom-4 sm:left-4 sm:w-[26rem] sm:rounded-3xl sm:shadow-float"
     >
+      <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-line sm:hidden" aria-hidden="true" />
       <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold leading-snug text-slate-900">{camera.name}</h2>
-          <p className="text-xs text-slate-500">Camera của Cổng thông tin giao thông TP.HCM, ảnh làm mới mỗi 15 giây</p>
+        <span className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-mist text-ink-soft">
+          <Icon name="camera" className="h-[18px] w-[18px]" />
+        </span>
+        <div className="min-w-0 flex-1 pt-1">
+          <h2 className="text-[17px] font-semibold leading-snug tracking-[-0.01em] text-ink">{camera.name}</h2>
+          <p className="mt-0.5 text-xs text-ink-faint">Cổng thông tin giao thông TP.HCM · ảnh làm mới mỗi 15 giây</p>
         </div>
-        <button type="button" aria-label="Đóng thẻ camera" onClick={onClose} className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl text-slate-500 hover:bg-slate-100">
-          ×
-        </button>
+        <CloseButton label="Đóng thẻ camera" onClick={onClose} className="-mr-2" />
       </div>
       {camera.has_image ? (
-        <img src={serverUrl(`/api/cameras/${camera.id}.jpg?t=${tick}`)} alt={`Ảnh camera ${camera.name} lúc này`} className="mt-2 aspect-video w-full rounded-lg bg-slate-200 object-cover" />
+        <div className="relative mt-3 overflow-hidden rounded-2xl bg-mist">
+          <img src={serverUrl(`/api/cameras/${camera.id}.jpg?t=${tick}`)} alt={`Ảnh camera ${camera.name} lúc này`} className="aspect-video w-full object-cover" />
+          <span className="absolute left-2 top-2 flex items-center gap-1.5 rounded-full bg-ink/75 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-white">
+            <span aria-hidden="true" className="h-1.5 w-1.5 animate-pulse rounded-full bg-red-400" />
+            Trực tiếp
+          </span>
+        </div>
       ) : (
-        <p className="mt-2 rounded-lg bg-slate-100 px-3 py-6 text-center text-sm text-slate-600">Camera này hiện không có hình.</p>
+        <p className="mt-3 rounded-2xl bg-mist px-3 py-8 text-center text-sm text-ink-faint">Camera này hiện không có hình.</p>
       )}
       {reading && (
-        <div role="status" className={`mt-2 rounded-lg border px-3 py-2 text-sm ${reading.flooded ? "border-red-300 bg-red-50 text-red-950" : "border-emerald-300 bg-emerald-50 text-emerald-950"}`}>
-          <p className="font-semibold">Gemini đọc: {readingSummary(reading)}</p>
-          {reading.evidence && <p className="mt-0.5">{reading.evidence}</p>}
-          {reading.confidence !== undefined && <p className="mt-0.5 text-xs">Độ chắc {Math.round(reading.confidence * 100)}%. Lượt đọc đủ chắc được ghi thành một báo cáo trên tuyến này.</p>}
+        <div role="status" className={`mt-3 flex gap-2.5 rounded-2xl px-3.5 py-3 text-sm ${reading.flooded ? "bg-danger-tint text-danger-ink" : "bg-safe-tint text-safe-ink"}`}>
+          <Icon name={reading.flooded ? "alert" : "check"} className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${reading.flooded ? "text-danger" : "text-safe"}`} />
+          <div className="min-w-0">
+            <p className="font-semibold leading-snug">Gemini đọc: {readingSummary(reading)}</p>
+            {reading.evidence && <p className="mt-1 leading-snug opacity-90">{reading.evidence}</p>}
+            {reading.confidence !== undefined && <p className="mt-1 text-xs opacity-80">Độ chắc {Math.round(reading.confidence * 100)}%. Lượt đọc đủ chắc được ghi thành một báo cáo trên tuyến này.</p>}
+          </div>
         </div>
       )}
-      {error && <p role="alert" className="mt-2 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-950">{error}</p>}
+      {error && <p role="alert" className="mt-3 rounded-2xl bg-caution-tint px-3.5 py-3 text-sm text-caution-ink">{error}</p>}
       {camera.has_image && (
-        <button type="button" disabled={busy} onClick={read} className="mt-3 min-h-11 w-full rounded-lg bg-blue-700 px-3 text-sm font-medium text-white enabled:hover:bg-blue-800 disabled:opacity-60">
-          {busy ? "Đang đọc, khoảng nửa phút…" : "Nhờ Gemini đọc ảnh này"}
+        <button type="button" disabled={busy} onClick={read} className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-brand px-3 text-sm font-semibold text-white transition-colors enabled:hover:bg-brand-strong enabled:active:scale-[0.99] disabled:opacity-70">
+          <Icon name="sparkle" className={`h-[18px] w-[18px] ${busy ? "animate-spin" : ""}`} />
+          {busy ? "Đang đọc ảnh, khoảng nửa phút…" : "Nhờ Gemini đọc mặt đường"}
         </button>
       )}
     </section>

@@ -1,7 +1,7 @@
 import type { RiskHour, RiskState } from "../api";
 import type { FloodNote } from "../components/PlaceCard";
 import type { MapHit } from "../MapView";
-import { clockOf, LEVEL_LABEL, NO_TIDE, routeLevel, routeReasons, STATE_LABEL, type TideExtent } from "./risk";
+import { clockOf, LEVEL_LABEL, NO_TIDE, routeLevel, routeReasons, STATE_LABEL, type DayState, type TideExtent } from "./risk";
 
 /** "19:40" theo giờ Việt Nam từ một mốc giờ ISO bất kỳ múi giờ. */
 export function clockInVietnam(iso: string): string {
@@ -14,29 +14,9 @@ function metres(level: number): string {
   return `${level.toFixed(2).replace(".", ",")} m`;
 }
 
-/** " · đỉnh triều 1,57 m lúc 05:00": giờ triều cao nhất trong 12 giờ tới theo dự báo Phú An; rỗng khi không có dự báo. */
-export function nextPeak(risk: Pick<RiskState, "tide_forecast">): string {
-  const ahead = risk.tide_forecast ?? [];
-  if (ahead.length === 0) return "";
-  const peak = ahead.reduce((best, hour) => (hour.level_m > best.level_m ? hour : best));
-  return ` · đỉnh triều ${metres(peak.level_m)} lúc ${clockOf(peak.time)}`;
-}
-
 /** Phần tô theo triều đang dùng: lấy từ máy chủ, không có thì không tô. */
 export function tideExtentOf(risk: Pick<RiskState, "tide_extent"> | null): TideExtent {
   return risk?.tide_extent ?? NO_TIDE;
-}
-
-/** Dòng trạng thái dưới ô tìm kiếm: mưa và triều của cả thành phố theo mô hình, kèm giờ tính. */
-export function riskLine(risk: RiskState | null): string {
-  if (!risk) return "Chưa có mức nguy cơ";
-  const now = risk.hours[0];
-  const tide = risk.local?.tide ? ` (Phú An ${metres(risk.local.tide.level_m)})` : "";
-  const forecast = risk.rain_missing ? "chưa có số liệu" : STATE_LABEL[risk.model_rain];
-  const radar = risk.radar ? ` · radar ${clockInVietnam(risk.radar.image_time)}: ${risk.radar.watch.length + risk.radar.alert.length} tuyến` : "";
-  const rain = risk.wet_gauges === null ? `Mưa: ${forecast}` : `Đang mưa to quanh ${risk.wet_gauges} trạm${radar} · Dự báo cả thành phố: ${forecast}`;
-  const text = `${rain} · Triều: ${STATE_LABEL[risk.states.tide]}${tide}${nextPeak(risk)} · ${clockOf(now.valid_time)}`;
-  return risk.stale && !risk.rain_missing ? `${text} · số liệu cũ` : text;
 }
 
 /** Nội dung ô thông tin ngập trên thẻ địa điểm, từ thứ người dùng vừa chạm trúng. */
@@ -76,4 +56,52 @@ export function floodNote(hit: MapHit | null, now: RiskHour | null, risk: RiskSt
     title: `${name}: nguy cơ ngập mức ${LEVEL_LABEL[level]}`,
     lines: [...lines, "Đây là dự báo, chưa có ai quan sát tại chỗ."],
   };
+}
+
+export type Tone = "quiet" | "watch" | "alert";
+
+/** Thanh trạng thái gọn: mưa và triều mỗi thứ một ô, kèm đỉnh triều kế tiếp và giờ đọc số liệu. */
+export interface StatusParts {
+  rain: { tone: Tone; text: string };
+  tide: { tone: Tone; text: string };
+  peak: { tone: Tone; text: string } | null;
+  updated: string;
+  details: string[];
+}
+
+const TONE_OF: Record<DayState, Tone> = { quiet: "quiet", watch: "watch", alert: "alert" };
+
+function tideTone(level: number): Tone {
+  return level >= 1.5 ? "alert" : level >= 1.4 ? "watch" : "quiet";
+}
+
+export function statusParts(risk: RiskState | null): StatusParts | null {
+  if (!risk) return null;
+  const gauges = risk.local?.gauges ?? [];
+  const wet = gauges.filter((g) => g.state !== "quiet");
+  const radarAlert = risk.radar?.alert.length ?? 0;
+  const radarWatch = risk.radar?.watch.length ?? 0;
+  const rainTone: Tone = wet.some((g) => g.state === "alert") || radarAlert > 0 ? "alert" : wet.length > 0 || radarWatch > 0 ? "watch" : "quiet";
+  const rainText =
+    rainTone === "quiet"
+      ? "Không có mưa lớn"
+      : wet.length > 0
+        ? `Mưa lớn quanh ${wet.length} trạm đo`
+        : `Radar thấy mưa lớn`;
+  const level = risk.local?.tide?.level_m;
+  const tide = level === undefined
+    ? { tone: TONE_OF[risk.states.tide], text: `Triều ${STATE_LABEL[risk.states.tide]}` }
+    : { tone: tideTone(level), text: `Phú An ${metres(level)}` };
+  const ahead = risk.tide_forecast ?? [];
+  const top = ahead.length ? ahead.reduce((best, hour) => (hour.level_m > best.level_m ? hour : best)) : null;
+  const peak = top ? { tone: tideTone(top.level_m), text: `Đỉnh ${metres(top.level_m)} lúc ${clockOf(top.time)}` } : null;
+  const updated = clockInVietnam(risk.local?.at ?? risk.hours[0].valid_time);
+  const details = [
+    wet.length > 0 ? `Trạm đang mưa lớn: ${wet.map((g) => `${g.name} ${g.last_1h_mm.toLocaleString("vi-VN")} mm/giờ`).join(", ")}.` : "Không trạm đo nào mưa từ 30 mm/giờ.",
+    risk.radar ? `Radar lúc ${clockInVietnam(risk.radar.image_time)}: ${radarWatch + radarAlert} tuyến có mưa lớn.` : "Chưa có số liệu radar mới.",
+    risk.rain_missing ? "Dự báo mưa chung cả thành phố: chưa có số liệu." : `Dự báo mưa chung cả thành phố: ${STATE_LABEL[risk.model_rain]}.`,
+    "Báo động triều tại Phú An: 1,40 m (mức 1), 1,50 m (mức 2), 1,60 m (mức 3).",
+  ];
+  if (risk.stale && !risk.rain_missing) details.push("Số liệu có thể đã cũ.");
+  return { rain: { tone: rainTone, text: rainText }, tide, peak, updated, details };
 }

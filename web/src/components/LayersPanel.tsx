@@ -1,5 +1,6 @@
 import type { City, CityKey } from "../api";
 import { CAMERA_COLOR, LEVEL_COLOR, POINT_COLOR, REPORT_COLOR } from "../MapView";
+import { CloseButton } from "./Icon";
 
 interface Props {
   cities: City[];
@@ -27,19 +28,17 @@ export default function LayersPanel({ cities, current, showRisk, showPoints, sho
   return (
     <section
       aria-label="Lớp bản đồ"
-      className="absolute right-3 top-[4.25rem] z-20 max-h-[calc(100dvh-6rem)] w-72 overflow-y-auto rounded-xl bg-white p-3 shadow-lg ring-1 ring-slate-200"
+      className="pop-in absolute right-3 top-[4.25rem] z-20 max-h-[calc(100dvh-6rem)] w-[min(19rem,calc(100vw-1.5rem))] overflow-y-auto rounded-3xl bg-white p-4 pt-3 shadow-float ring-1 ring-line"
     >
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-slate-900">Lớp ngập</h2>
-        <button type="button" aria-label="Đóng bảng lớp" onClick={onClose} className="flex h-11 w-11 items-center justify-center rounded-full text-xl text-slate-500 hover:bg-slate-100">
-          ×
-        </button>
+        <h2 className="text-base font-semibold tracking-[-0.01em] text-ink">Lớp ngập</h2>
+        <CloseButton label="Đóng bảng lớp" onClick={onClose} className="-mr-2" />
       </div>
-      <label className="flex min-h-11 items-center gap-3 text-base text-slate-900">
-        <input type="checkbox" className="h-5 w-5" checked={showRisk} onChange={(event) => onShowRisk(event.target.checked)} />
+      <label className="flex min-h-11 items-center gap-3 text-[15px] font-medium text-ink">
+        <input type="checkbox" className="h-5 w-5 accent-[#0b3a6e]" checked={showRisk} onChange={(event) => onShowRisk(event.target.checked)} />
         Nguy cơ ngập
       </label>
-      <ul className="mb-1 ml-8 space-y-1 text-sm text-slate-700">
+      <ul className="mb-1 ml-8 space-y-1 text-[13px] text-ink-soft">
         <li className="flex items-center gap-2">
           <Line color={LEVEL_COLOR[2]} /> Mức cao
         </li>
@@ -54,11 +53,11 @@ export default function LayersPanel({ cities, current, showRisk, showPoints, sho
           <Dot color={REPORT_COLOR.clear} /> Có báo không ngập
         </li>
       </ul>
-      <label className="flex min-h-11 items-center gap-3 text-base text-slate-900">
-        <input type="checkbox" className="h-5 w-5" checked={showPoints} onChange={(event) => onShowPoints(event.target.checked)} />
+      <label className="flex min-h-11 items-center gap-3 text-[15px] font-medium text-ink">
+        <input type="checkbox" className="h-5 w-5 accent-[#0b3a6e]" checked={showPoints} onChange={(event) => onShowPoints(event.target.checked)} />
         Điểm ngập CSGT công bố
       </label>
-      <ul className="mb-2 ml-8 space-y-1 text-sm text-slate-700">
+      <ul className="mb-2 ml-8 space-y-1 text-[13px] text-ink-soft">
         <li className="flex items-center gap-2">
           <Dot color={POINT_COLOR.rain} /> Ngập do mưa
         </li>
@@ -67,17 +66,17 @@ export default function LayersPanel({ cities, current, showRisk, showPoints, sho
         </li>
       </ul>
 
-      <label className="flex min-h-11 items-center gap-3 text-base text-slate-900">
-        <input type="checkbox" className="h-5 w-5" checked={showCameras} onChange={(event) => onShowCameras(event.target.checked)} />
+      <label className="flex min-h-11 items-center gap-3 text-[15px] font-medium text-ink">
+        <input type="checkbox" className="h-5 w-5 accent-[#0b3a6e]" checked={showCameras} onChange={(event) => onShowCameras(event.target.checked)} />
         Camera giao thông
       </label>
-      <ul className="mb-2 ml-8 space-y-1 text-sm text-slate-700">
+      <ul className="mb-2 ml-8 space-y-1 text-[13px] text-ink-soft">
         <li className="flex items-center gap-2">
           <Dot color={CAMERA_COLOR} /> Phóng gần để thấy; chạm để xem ảnh
         </li>
       </ul>
 
-      <h2 className="border-t border-slate-200 pt-2 text-sm font-semibold text-slate-900">Thành phố</h2>
+      <h2 className="mt-1 border-t border-line pt-3 text-base font-semibold tracking-[-0.01em] text-ink">Thành phố</h2>
       <div role="radiogroup" aria-label="Thành phố" className="mt-1 flex flex-col gap-1">
         {cities.map((city) => (
           <button
@@ -86,8 +85,8 @@ export default function LayersPanel({ cities, current, showRisk, showPoints, sho
             role="radio"
             aria-checked={city.key === current}
             onClick={() => onCity(city.key)}
-            className={`min-h-11 rounded-lg px-3 text-left text-base ${
-              city.key === current ? "bg-blue-50 font-medium text-blue-800 ring-1 ring-blue-300" : "text-slate-900 hover:bg-slate-50"
+            className={`min-h-11 rounded-xl px-3 text-left text-[15px] transition-colors ${
+              city.key === current ? "bg-brand-tint font-semibold text-brand-strong" : "text-ink hover:bg-mist"
             }`}
           >
             {city.name}

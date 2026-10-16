@@ -1,4 +1,5 @@
 import { addressRest, formatCoords } from "../lib/format";
+import Icon, { CloseButton, type IconName } from "./Icon";
 
 export interface Pin {
   lat: number;
@@ -15,10 +16,10 @@ export interface FloodNote {
   lines: string[];
 }
 
-const NOTE_TONE: Record<FloodNote["tone"], string> = {
-  high: "border-red-300 bg-red-50 text-red-950",
-  medium: "border-amber-300 bg-amber-50 text-amber-950",
-  info: "border-sky-300 bg-sky-50 text-sky-950",
+const NOTE_TONE: Record<FloodNote["tone"], { box: string; icon: string; name: IconName }> = {
+  high: { box: "bg-danger-tint text-danger-ink", icon: "text-danger", name: "alert" },
+  medium: { box: "bg-caution-tint text-caution-ink", icon: "text-caution", name: "alert" },
+  info: { box: "bg-brand-tint text-brand-strong", icon: "text-brand", name: "info" },
 };
 
 interface Props {
@@ -30,19 +31,20 @@ interface Props {
   onReport?: () => void;
 }
 
-function ActionButton({ label, onClick, primary = false }: { label: string; onClick?: () => void; primary?: boolean }) {
+function ActionButton({ label, icon, onClick, primary = false }: { label: string; icon: IconName; onClick?: () => void; primary?: boolean }) {
   const enabled = onClick !== undefined;
   const tone = primary
-    ? "bg-blue-700 text-white enabled:hover:bg-blue-800"
-    : "bg-slate-100 text-slate-900 enabled:hover:bg-slate-200";
+    ? "bg-brand text-white enabled:hover:bg-brand-strong"
+    : "bg-mist text-ink enabled:hover:bg-line";
   return (
     <button
       type="button"
       disabled={!enabled}
       title={enabled ? undefined : "Sắp có"}
       onClick={onClick}
-      className={`min-h-11 flex-1 rounded-lg px-3 text-sm font-medium disabled:opacity-45 ${tone}`}
+      className={`flex min-h-12 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition-colors enabled:active:scale-[0.98] disabled:opacity-45 ${primary ? "col-span-2" : ""} ${tone}`}
     >
+      <Icon name={icon} className="h-[18px] w-[18px]" />
       {label}
     </button>
   );
@@ -54,37 +56,34 @@ export default function PlaceCard({ pin, flood, onClose, onDirectionsTo, onDirec
   return (
     <section
       aria-label="Thông tin địa điểm"
-      className="absolute inset-x-0 bottom-0 z-10 rounded-t-2xl bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-[0_-4px_16px_rgba(0,0,0,0.15)] sm:inset-x-auto sm:bottom-4 sm:left-4 sm:w-96 sm:rounded-2xl"
+      className="sheet-in absolute inset-x-0 bottom-0 z-10 max-h-[70dvh] overflow-y-auto rounded-t-3xl bg-white px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2.5 shadow-sheet sm:inset-x-auto sm:bottom-4 sm:left-4 sm:w-96 sm:rounded-3xl sm:shadow-float"
     >
+      <div className="mx-auto mb-2 h-1 w-10 rounded-full bg-line sm:hidden" aria-hidden="true" />
       <div className="flex items-start gap-2">
-        <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-semibold leading-snug text-slate-900">{title}</h2>
-          {rest && <p className="text-sm text-slate-700">{rest}</p>}
-          <p className="mt-0.5 text-xs text-slate-500">{formatCoords(pin.lat, pin.lon)}</p>
+        <div className="min-w-0 flex-1 pt-1">
+          <h2 className="text-lg font-semibold leading-snug tracking-[-0.01em] text-ink">{title}</h2>
+          {rest && <p className="mt-0.5 text-sm text-ink-soft">{rest}</p>}
+          <p className="mt-1 text-xs text-ink-faint">{formatCoords(pin.lat, pin.lon)}</p>
         </div>
-        <button
-          type="button"
-          aria-label="Đóng thẻ địa điểm"
-          onClick={onClose}
-          className="-mr-2 -mt-1 flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-2xl text-slate-500 hover:bg-slate-100"
-        >
-          ×
-        </button>
+        <CloseButton label="Đóng thẻ địa điểm" onClick={onClose} className="-mr-2" />
       </div>
       {flood && (
-        <div role="note" aria-label="Thông tin ngập" className={`mt-2 rounded-lg border px-3 py-2 text-sm ${NOTE_TONE[flood.tone]}`}>
-          <p className="font-semibold">{flood.title}</p>
-          {flood.lines.map((line) => (
-            <p key={line} className="mt-0.5">
-              {line}
-            </p>
-          ))}
+        <div role="note" aria-label="Thông tin ngập" className={`mt-3 flex gap-2.5 rounded-2xl px-3.5 py-3 text-sm ${NOTE_TONE[flood.tone].box}`}>
+          <Icon name={NOTE_TONE[flood.tone].name} className={`mt-0.5 h-[18px] w-[18px] shrink-0 ${NOTE_TONE[flood.tone].icon}`} />
+          <div className="min-w-0">
+            <p className="font-semibold leading-snug">{flood.title}</p>
+            {flood.lines.map((line) => (
+              <p key={line} className="mt-1 leading-snug opacity-90">
+                {line}
+              </p>
+            ))}
+          </div>
         </div>
       )}
-      <div className="mt-3 flex gap-2">
-        <ActionButton label="Chỉ đường tới đây" onClick={onDirectionsTo} primary />
-        <ActionButton label="Đi từ đây" onClick={onDirectionsFrom} />
-        <ActionButton label="Báo ngập ở đây" onClick={onReport} />
+      <div className="mt-3 grid grid-cols-2 gap-2">
+        <ActionButton label="Chỉ đường tới đây" icon="route" onClick={onDirectionsTo} primary />
+        <ActionButton label="Đi từ đây" icon="from" onClick={onDirectionsFrom} />
+        <ActionButton label="Báo ngập" icon="flag" onClick={onReport} />
       </div>
     </section>
   );

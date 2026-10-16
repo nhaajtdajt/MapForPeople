@@ -1,5 +1,31 @@
 @import "tailwindcss";
 
+/* Màu và chữ của app. Đỏ, hổ phách, xanh lá trùng đúng màu tô trên bản đồ (MapView.tsx), để thẻ và đường không lệch nhau. */
+@theme {
+  --font-sans: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, sans-serif;
+  --color-ink: #0f1d2e; /* chữ chính */
+  --color-ink-soft: #3d4c5e; /* chữ phụ */
+  --color-ink-faint: #5f6c7b; /* chú thích, tọa độ */
+  --color-line: #dbe2ea; /* viền mảnh */
+  --color-mist: #f1f4f8; /* nền phụ, nút phụ */
+  --color-brand: #0b3a6e; /* xanh sông đêm: nút chính */
+  --color-brand-strong: #082c55;
+  --color-brand-tint: #e6eef8;
+  --color-danger: #dc2626; /* mức cao: trùng LEVEL_COLOR[2] */
+  --color-danger-ink: #8a1414;
+  --color-danger-tint: #fdecec;
+  --color-caution: #f59e0b; /* mức vừa: trùng LEVEL_COLOR[1] */
+  --color-caution-ink: #7a4a00;
+  --color-caution-tint: #fff4dc;
+  --color-safe: #15803d;
+  --color-safe-ink: #0f5a2c;
+  --color-safe-tint: #e5f5ea;
+  --color-water: #0d9488; /* triều: trùng POINT_COLOR.tide */
+  --shadow-float: 0 1px 2px rgb(15 29 46 / 0.08), 0 6px 18px -4px rgb(15 29 46 / 0.18);
+  --shadow-sheet: 0 -2px 6px rgb(15 29 46 / 0.06), 0 -12px 32px -8px rgb(15 29 46 / 0.22);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 html,
 body,
 #root {
@@ -8,9 +34,34 @@ body,
 }
 
 body {
-  font-family: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: var(--font-sans);
+  color: var(--color-ink);
   -webkit-tap-highlight-color: transparent;
+  -webkit-font-smoothing: antialiased;
   overscroll-behavior: none;
+  font-feature-settings: "tnum" 1; /* số thẳng cột: giờ, mm, mét */
+}
+
+/* Đặt trong lớp base để các lớp tiện ích của Tailwind (ví dụ focus-visible:outline-none) vẫn ghi đè được. */
+@layer base {
+::selection {
+  background: var(--color-brand-tint);
+  color: var(--color-brand-strong);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+input {
+  caret-color: var(--color-brand);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #b9c4d0 transparent;
+}
 }
 
 /* Ô tìm kiếm có nút xóa riêng; ẩn nút xóa mặc định của trình duyệt để không bị hai nút ×. */
@@ -21,10 +72,52 @@ input[type="search"]::-webkit-search-decoration {
   display: none;
 }
 
+/* Thẻ trượt từ dưới lên, một lần, khi mở. */
+@keyframes sheet-in {
+  from {
+    transform: translateY(24px);
+    opacity: 0;
+  }
+}
+.sheet-in {
+  animation: sheet-in 0.32s var(--ease-out-expo);
+}
+@keyframes pop-in {
+  from {
+    transform: translateY(-6px) scale(0.98);
+    opacity: 0;
+  }
+}
+.pop-in {
+  animation: pop-in 0.22s var(--ease-out-expo);
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet-in,
+  .pop-in {
+    animation: none;
+  }
+}
+
+/* Nút điều khiển của bản đồ cùng kiểu với các nút của app. */
+.maplibregl-ctrl-group {
+  border-radius: 12px !important;
+  box-shadow: var(--shadow-float) !important;
+  overflow: hidden;
+}
+.maplibregl-ctrl-group button {
+  width: 40px !important;
+  height: 40px !important;
+}
+.maplibregl-ctrl-attrib {
+  font-family: var(--font-sans);
+  font-size: 11px;
+}
+
 /* Trên điện thoại, thẻ địa điểm trượt từ dưới lên; đẩy cụm nút của bản đồ lên trên thẻ. */
 @media (max-width: 639px) {
-  .maplibregl-ctrl-bottom-right {
+  .maplibregl-ctrl-bottom-right,
+  .maplibregl-ctrl-bottom-left {
     margin-bottom: var(--sheet-h, 0px);
-    transition: margin-bottom 0.2s ease;
+    transition: margin-bottom 0.25s var(--ease-out-expo);
   }
 }

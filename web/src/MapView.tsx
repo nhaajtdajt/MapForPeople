@@ -357,7 +357,7 @@ export default function MapView({ initial, pin, flyTo, risk, showRisk, points, s
   }, [ready, routes, selectedRouteId, routeRevision, directionOrigin, directionDestination, directionsOpen]);
   if (!MAP_KEY) {
     return (
-      <div className="flex h-full items-center justify-center p-6 text-center text-slate-700">
+      <div className="flex h-full items-center justify-center p-6 text-center text-ink-soft">
         Thiếu khóa bản đồ. Đặt VITE_GOONG_MAP_KEY trong file .env ở thư mục gốc rồi chạy lại.
       </div>
     );

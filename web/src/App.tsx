@@ -6,9 +6,12 @@ import LayersPanel from "./components/LayersPanel";
 import PlaceCard, { type Pin } from "./components/PlaceCard";
 import DirectionsPanel from "./components/DirectionsPanel";
 import ReportSheet from "./components/ReportSheet";
+import Icon from "./components/Icon";
+import Legend from "./components/Legend";
 import SearchBar from "./components/SearchBar";
+import StatusBar from "./components/StatusBar";
 import StatusChip from "./components/StatusChip";
-import { floodNote, riskLine, tideExtentOf } from "./lib/floodnote";
+import { floodNote, tideExtentOf } from "./lib/floodnote";
 import { loadView, saveView } from "./lib/viewstore";
 import { useDirections } from "./lib/useDirections";
 import MapView, { type FlyTarget, type MapHit, type MapViewState } from "./MapView";
@@ -226,25 +229,33 @@ export default function App() {
         onNotice={setNotice}
       />
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-1.5 p-3">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 flex flex-col gap-2 p-3 pt-[max(0.75rem,env(safe-area-inset-top))] sm:max-w-xl">
         <div className="pointer-events-auto flex items-start gap-2">
           <SearchBar near={center} onPick={handlePick} />
           <button
             type="button"
             aria-expanded={layersOpen}
+            aria-label="Lớp bản đồ và thành phố"
             onClick={() => setLayersOpen((value) => !value)}
-            className="flex h-12 shrink-0 items-center rounded-xl bg-white px-4 text-base font-medium text-slate-900 shadow-md ring-1 ring-slate-200 hover:bg-slate-50"
+            className={`flex h-12 shrink-0 items-center gap-1.5 rounded-2xl px-3.5 text-[15px] font-semibold shadow-float transition-colors ${layersOpen ? "bg-brand text-white" : "bg-white text-ink hover:bg-mist"}`}
           >
-            Lớp
+            <Icon name="layers" />
+            <span className="hidden min-[380px]:inline">Lớp</span>
           </button>
         </div>
-        <div className="pointer-events-auto flex items-center justify-between gap-2">
-          <span className="rounded-full bg-white/90 px-3 py-1 text-xs font-medium text-slate-800 shadow-sm ring-1 ring-slate-200">
-            {CITY_LABELS[cityKey]} · {riskLine(risk)}
-          </span>
+        <div className="pointer-events-auto flex items-start justify-between gap-2">
+          <StatusBar city={CITY_LABELS[cityKey]} risk={risk} />
           <StatusChip health={health} />
         </div>
       </div>
+
+      {showRisk && riskView && !directions.isOpen && !pin && !camera && (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-[5] flex justify-start pb-[max(2.25rem,calc(env(safe-area-inset-bottom)+2rem))] pl-3 pr-16">
+          <div className="pointer-events-auto">
+            <Legend />
+          </div>
+        </div>
+      )}
 
       {layersOpen && (
         <LayersPanel
@@ -277,8 +288,11 @@ export default function App() {
       <DirectionsPanel directions={directions} near={center} />
 
       {notice && (
-        <div role="status" className="pointer-events-none absolute inset-x-0 top-28 z-30 flex justify-center px-4">
-          <p className="pointer-events-auto max-w-sm rounded-xl bg-slate-900 px-4 py-3 text-center text-sm text-white shadow-lg">{notice}</p>
+        <div role="status" className="pointer-events-none absolute inset-x-0 top-32 z-30 flex justify-center px-4">
+          <p className="pop-in pointer-events-auto flex max-w-sm items-start gap-2.5 rounded-2xl bg-ink px-4 py-3 text-sm leading-snug text-white shadow-float">
+            <Icon name="info" className="mt-0.5 h-4 w-4 shrink-0 text-sky-300" />
+            {notice}
+          </p>
         </div>
       )}
     </div>
