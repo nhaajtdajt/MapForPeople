@@ -70,8 +70,7 @@ def rain_state(stations: list[dict], rate: np.ndarray | None):
     for st in stations:
         st["state"] = local.gauge_state_of(st["mm1"], st["mm3"])
         if st["state"]:
-            near = km(LAT, LON, st["lat"], st["lon"]) * 1000 <= local.RADIUS_M
-            gauge_state[near] = np.maximum(gauge_state[near], st["state"])
+            gauge_state = np.maximum(gauge_state, local.spread(LAT, LON, st["lat"], st["lon"], st["state"]))
     radar_state = np.zeros(len(routes), np.uint8)
     radar_value = np.zeros(len(routes), np.float32)
     if rate is not None:
@@ -96,7 +95,7 @@ def rain_basis(row: int, level: int, stations, gauge_state, radar_state, radar_v
         st = max(trig, key=lambda s: (s["state"], s["mm1"]))
         lines.append(f"Trạm {st['name']} cách {d[st['name']]:.1f} km đo {st['mm1']:g} mm trong một giờ"
                      + (f" ({st['mm3']:g} mm trong 3 giờ)" if st["mm3"] > st["mm1"] else "") + ": "
-                     f"{'báo động (từ 35 mm/giờ)' if st['state'] == 2 else 'cảnh giác (từ 30 mm/giờ)'}, áp cho đường trong {local.RADIUS_M / 1000:g} km.")
+                     f"{'báo động (từ 35 mm/giờ)' if st['state'] == 2 else 'cảnh giác (từ 30 mm/giờ)'}; trạm áp đủ mức cho đường trong {local.FULL_RADIUS_M / 1000:g} km, tối đa vàng tới {local.RADIUS_M / 1000:g} km.")
     elif nearest is not None:
         lines.append(f"Trạm đo gần nhất ({nearest['name']}, cách {d[nearest['name']]:.1f} km) chỉ đo {nearest['mm1']:g} mm trong một giờ: "
                      f"{'dưới ngưỡng cảnh giác 30 mm/giờ' if nearest['mm1'] < 30 else f'nhưng ở xa hơn {local.RADIUS_M / 1000:g} km'}.")

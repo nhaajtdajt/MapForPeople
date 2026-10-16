@@ -133,3 +133,10 @@ def test_phu_an_replaces_the_model_tide_state_and_gives_a_forecast():
     source = SimpleNamespace(rain_gauges=lambda: [], gauge_hours=lambda g: [], tide_point=broken)
     found = local.read(_model(), _hour(tide=levels.ALERT), source, NOW)
     assert list(local.route_levels(_model(), found)) == [0, 2, 0] and found.tide_forecast == []
+
+
+def test_a_station_gives_its_full_level_only_nearby_and_at_most_watch_further_out():
+    lat = np.array([10.80, 10.815, 10.83, 10.85])  # cách trạm 0, khoảng 1,7, 3,3 và 5,5 km
+    lon = np.full(4, 106.70)
+    assert list(local.spread(lat, lon, 10.80, 106.70, levels.ALERT)) == [levels.ALERT, levels.ALERT, levels.WATCH, levels.QUIET]
+    assert list(local.spread(lat, lon, 10.80, 106.70, levels.WATCH)) == [levels.WATCH, levels.WATCH, levels.WATCH, levels.QUIET]

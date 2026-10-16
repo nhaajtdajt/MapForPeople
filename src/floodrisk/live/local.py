@@ -26,6 +26,10 @@ import pandas as pd
 from floodrisk.model import levels
 
 RADIUS_M = 4000.0
+# Trong FULL_RADIUS_M quanh trạm: đủ mức của trạm. Từ đó tới RADIUS_M: tối đa cảnh giác (vàng). Trước 16/10 cả vòng 4 km
+# như nhau, nên một ngày bốn trạm cùng mưa to (07/10) tô đỏ 22% đường lớn nội thành. Chấm trên ba trận mưa có tin ngập
+# (01, 06, 07/10): số đoạn đỏ giảm 62-72%, không trận nào mất chỗ ngập thật nào (07/10 vẫn 7/7, 06/10 4/4, 01/10 1/2).
+FULL_RADIUS_M = 2000.0
 GAUGE_WATCH = (30.0, 50.0)  # mm trong giờ gần nhất, mm trong 3 giờ: đạt một trong hai là cảnh giác
 GAUGE_ALERT = (35.0, 80.0)  # tương tự, cho báo động
 TIDE_WATCH_M = 1.40  # báo động 1 tại Phú An
@@ -106,6 +110,13 @@ def _distance_m(lat, lon, lat0: float, lon0: float) -> np.ndarray:
     return np.hypot((np.asarray(lon) - lon0) * kx, (np.asarray(lat) - lat0) * 110_540.0)
 
 
+def spread(lat, lon, lat0: float, lon0: float, state: int) -> np.ndarray:
+    """Trạng thái mưa mà một trạm gán cho từng tuyến: đủ mức trong FULL_RADIUS_M, tối đa cảnh giác tới RADIUS_M, ngoài đó yên."""
+    distance = _distance_m(lat, lon, lat0, lon0)
+    out = np.where(distance <= FULL_RADIUS_M, state, min(state, levels.WATCH))
+    return np.where(distance <= RADIUS_M, out, levels.QUIET).astype(np.uint8)
+
+
 def routes_within(routes: pd.DataFrame, lat: float, lon: float, max_m: float, min_band: int = 2) -> np.ndarray:
     """Dòng của những tuyến có nhóm mưa từ `min_band` nằm trong `max_m` quanh một điểm (camera thấy gì thì nói cho cả khu nó nhìn)."""
     near = _distance_m(routes.lat.to_numpy(float), routes.lon.to_numpy(float), lat, lon) <= max_m
@@ -127,8 +138,7 @@ def read(model, hour, source, now: datetime | None = None) -> Local:
             state = gauge_state_of(inputs["last_1h_mm"], inputs["max_3h_mm"])
             gauges.append({"name": g["name"], "lat": g["lat"], "lon": g["lon"], **inputs, "state": state})
             if state > levels.QUIET:
-                near = _distance_m(lat, lon, g["lat"], g["lon"]) <= RADIUS_M
-                rain_state[near] = np.maximum(rain_state[near], state)
+                rain_state = np.maximum(rain_state, spread(lat, lon, g["lat"], g["lon"], state))
     except Exception as exc:  # cổng số liệu lỗi: không còn số đo, tạm dùng trạng thái chung của mô hình và báo lại
         errors.append(f"Chưa đọc được trạm mưa: {type(exc).__name__}: {exc}")
         rain_state = np.full(len(model.routes), hour.rain.state, np.uint8)
