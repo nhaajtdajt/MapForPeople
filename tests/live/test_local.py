@@ -140,3 +140,17 @@ def test_a_station_gives_its_full_level_only_nearby_and_at_most_watch_further_ou
     lon = np.full(4, 106.70)
     assert list(local.spread(lat, lon, 10.80, 106.70, levels.ALERT)) == [levels.ALERT, levels.ALERT, levels.WATCH, levels.QUIET]
     assert list(local.spread(lat, lon, 10.80, 106.70, levels.WATCH)) == [levels.WATCH, levels.WATCH, levels.WATCH, levels.QUIET]
+
+
+def test_bridges_never_get_a_flood_level(tmp_path, monkeypatch):
+    from floodrisk import config
+    from floodrisk.model.live import CityModel
+
+    table = pd.read_parquet(config.route_table_path("hcm"))
+    model = CityModel("hcm")
+    if "elevated" not in table:
+        return  # dữ liệu mẫu chưa đánh dấu cầu
+    bridges = table.elevated.to_numpy(bool)
+    assert bridges.any() and (model.bands_rain[bridges] == 0).all() and (model.bands_tide[bridges] == 0).all()
+    full = levels.extent_levels(model.tide_order, (.05, .20))
+    assert (full[bridges] == 0).all()

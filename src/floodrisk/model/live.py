@@ -82,6 +82,13 @@ class CityModel:
         self.bands_rain = self.routes.band_rain.to_numpy(np.uint8)
         self.bands_tide = self.routes.band_tide.to_numpy(np.uint8)
         self.tide_order = self.routes.tide_order.to_numpy(np.int32)  # vị trí trong bảng xếp hạng triều, 0 là dễ ngập nhất
+        # Cầu, cầu vượt (tools/them_cau_vuot.py) không bao giờ có mức ngập: bỏ khỏi nhóm mưa, nhóm triều và cuối bảng xếp hạng triều.
+        # Đây là quy tắc hiển thị của bản đồ, không sửa điểm của Mô hình 1.
+        if "elevated" in self.routes:
+            elevated = self.routes.elevated.to_numpy(bool)
+            self.bands_rain = np.where(elevated, 0, self.bands_rain).astype(np.uint8)
+            self.bands_tide = np.where(elevated, 0, self.bands_tide).astype(np.uint8)
+            self.tide_order = np.where(elevated, len(self.tide_order), self.tide_order).astype(np.int32)
         self.rain_cfg = _read_json(version / "rain_trigger.json")
         final = _read_json(root / "final_config.json")
         self.rain_limits = (float(final["q_watch"]), float(final["q_alert"]))

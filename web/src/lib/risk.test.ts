@@ -47,6 +47,7 @@ describe("levelExpression", () => {
       if (op === "coalesce") return args.map((a) => evaluate(a, props)).find((v) => v !== undefined) as number;
       if (op === "max") return Math.max(...args.map((a) => evaluate(a, props)));
       if (op === "==") return evaluate(args[0], props) === evaluate(args[1], props) ? 1 : 0;
+      if (op === "coalesce") return args.map((a) => evaluate(a, props)).find((v) => v !== undefined) as number;
       if (op === "<") return evaluate(args[0], props) < evaluate(args[1], props) ? 1 : 0;
       if (op === "case") {
         for (let i = 0; i + 1 < args.length; i += 2) if (evaluate(args[i], props)) return evaluate(args[i + 1], props);
@@ -58,11 +59,19 @@ describe("levelExpression", () => {
       for (const tide of [NONE, BD1, BD2]) {
         for (const br of [0, 1, 2] as const) {
           for (const pt of [0, 2804, 2805, 7011, 7012, undefined]) {
-            expect(evaluate(levelExpression(rain, tide), { br, pt })).toBe(routeLevel({ br, pt }, rain, tide));
+            for (const ev of [undefined, 1]) {
+              expect(evaluate(levelExpression(rain, tide), { br, pt, ev })).toBe(routeLevel({ br, pt, ev }, rain, tide));
+            }
           }
         }
       }
     }
+  });
+});
+
+describe("cầu vượt", () => {
+  it("không bao giờ có mức, kể cả khi mưa và triều báo động", () => {
+    expect(routeLevel({ ...route, br: 2, pt: 0, ev: 1 }, "alert", BD2)).toBe(0);
   });
 });
 

@@ -14,6 +14,7 @@ export interface RouteProps {
   br: Band; // nhóm theo mưa
   bt: Band; // nhóm theo triều
   pt?: number; // vị trí trong bảng xếp hạng dễ ngập do triều, 0 là dễ ngập nhất
+  ev?: number; // 1 khi tuyến là cầu, cầu vượt: không bao giờ tô ngập
   hr: number; // số ngày từng ghi nhận ngập do mưa trước 2025
   ht: number; // số ngày từng ghi nhận ngập do triều trước 2025
 }
@@ -46,7 +47,8 @@ export function tideLevel(position: number | undefined, tide: TideExtent): Level
   return at < tide.red ? 2 : at < tide.coloured ? 1 : 0;
 }
 
-export function routeLevel(route: Pick<RouteProps, "br" | "pt">, rain: DayState, tide: TideExtent): Level {
+export function routeLevel(route: Pick<RouteProps, "br" | "pt" | "ev">, rain: DayState, tide: TideExtent): Level {
+  if (route.ev === 1) return 0;
   return Math.max(causeLevel(route.br, rain), tideLevel(route.pt, tide)) as Level;
 }
 
@@ -69,7 +71,8 @@ function tideExpression(tide: TideExtent): Expr | number {
  * `overrides` là mức riêng của vài tuyến (do trạm mưa gần đó hoặc do báo cáo), khóa là `id` của tuyến trong lớp bản đồ.
  */
 export function levelExpression(rain: DayState, tide: TideExtent, overrides: Record<string, number> = {}): Expr {
-  const base: Expr = ["max", causeExpression("br", rain), tideExpression(tide)];
+  // Cầu, cầu vượt (ev = 1) không bao giờ tô ngập: mặt cầu không ngập dù đường dưới gầm ngập.
+  const base: Expr = ["case", ["==", ["coalesce", ["get", "ev"], 0], 1], 0, ["max", causeExpression("br", rain), tideExpression(tide)]];
   const cases: unknown[] = [];
   for (const level of [0, 1, 2]) {
     const ids = Object.keys(overrides).filter((id) => overrides[id] === level).map(Number);
